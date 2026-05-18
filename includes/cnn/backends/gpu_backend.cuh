@@ -1,4 +1,5 @@
 #include <cnn/tensor.hpp>
+#include <types/memory.cuh>
 
 namespace GPU{
 
@@ -6,8 +7,7 @@ namespace GPU{
     Tensor scalarMultiply(Tensor& a);
     Tensor multipy(Tensor& a, Tensor& b);
 
-    float* allocateMemory(const std::vector<float>&);
-    void freeMemory(const float*);
-    float* getFromMemory(float *);
+    CudaMemPtr allocate_memory(const float* ptr, size_t size);
+    void free_memory(const CudaMemPtr&);
 
 };

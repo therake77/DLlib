@@ -7,16 +7,19 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 set(CMAKE_CUDA_ARCHITECTURES native)
+find_package(CUDAToolkit REQUIRED)
+
 
 include_directories(includes)
+
 
 add_library(cnn_lib STATIC
     includes/cnn.hpp
     src/cnn.cpp
     includes/cnn/tensor.hpp
     src/cnn/tensor.cpp
-    includes/cnn/backends/gpu_backend.cu
-    src/cnn/backends/gpu_backend.cpp
+    includes/cnn/backends/gpu_backend.cuh
+    src/cnn/backends/gpu_backend.cu
     includes/cnn/backends/cpu_backend.hpp
     src/cnn/backends/cpu_backend.cpp
     includes/cnn/layers/base_layer.hpp
@@ -27,3 +30,4 @@ add_library(cnn_lib STATIC
     src/cnn/layers/pooling.cpp
 )
 
+target_link_libraries(cnn_lib PRIVATE CUDA::cudart)

@@ -1,6 +1,6 @@
 #include <cnn/tensor.hpp>
-#include <cnn/backends/gpu_backend.cu>
 #include <stdexcept>
+#include <cnn/backends/gpu_backend.cuh>
 
 Tensor::Tensor(std::initializer_list<size_t> args, float default_value = 0.0f){
     size_t total_size = 1;
@@ -16,45 +16,38 @@ Tensor::Tensor(std::initializer_list<size_t> args, float default_value = 0.0f){
     }
 
     //Data initialization
-    (this->data)->reserve(total_size);
-
-    size_t index = 0;
-    while(index < total_size){
-        (*(this->data))[index] = default_value;
-        index++;
-    }
+    this->cpu_data = std::vector<float>(total_size,default_value);
 }
 
-Tensor::Tensor(Tensor& t){
-    //Just copy the elements
-    size_t total_size = 1;
-    for(size_t t : t.shape ){
-        total_size*=t;
-    }
-    size_t index = 0;
-    (this->data)->reserve(total_size);
-    while(index < total_size){
-        (*(this->data))[index] = (*(t.data))[index];
-    }
-}
+Tensor::Tensor(Tensor& t) : cpu_data(t.cpu_data) {}
 
 //TODO(Finish this)
 void Tensor::to(DeviceType dev){
     if(this->device == dev) return;
+    size_t total_data = 1;
+    for(auto it = this->shape.begin(); it != this->shape.end(); it++){
+        total_data*=*it;
+    }
+
     switch(dev){
         case DeviceType::CPU:{
             //GPU -> CPU
-            float* data = GPU::getFromMemory((this->gpu_data).get());
-            
-            GPU::freeMemory(this->gpu_data.get());
-            this->gpu_data.reset(nullptr);
+            (this->cpu_data).assign(
+                *(this->gpu_data.ptr),
+                this->gpu_data.size
+            );
+            GPU::free_memory(this->gpu_data);
         }
+        
         case DeviceType::GPU:{
-            //GPU -> CPU
+            //CPU -> GPU
             //Allocate memory for the tensor in the gpu
-            float* data_ptr = GPU::allocateMemory(*(this->data));
-            this->gpu_data.reset(data_ptr);
+            //Do not touch cpu mem
+            this->gpu_data= std::move(
+                GPU::allocate_memory((this->cpu_data).data(), this->cpu_data.size())
+            );
         }
+
         default : throw std::invalid_argument("Unknown device type");
     }
 }
