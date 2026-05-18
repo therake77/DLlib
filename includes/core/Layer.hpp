@@ -1,4 +1,5 @@
-#include <cnn/tensor.hpp>
+#pragma once
+#include <core/Tensor.hpp>
 
 class Layer{
 protected:

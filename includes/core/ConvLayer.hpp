@@ -1,4 +1,4 @@
-#include <cnn/layers/base_layer.hpp>
+#include <core/Layer.hpp>
 
 class Conv2D : public Layer{
 
