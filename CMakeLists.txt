@@ -29,6 +29,9 @@ set(SRC_FILES
     src/core/Tensor.cpp
     src/hardware/CpuDevice.cpp
     src/hardware/DeviceManager.cpp
+    src/kernel/CpuMath.cpp
+    src/kernel/GpuMath.cu
+    src/kernel/TensorMath.cpp
 )
 
 if(CMAKE_CUDA_COMPILER)
