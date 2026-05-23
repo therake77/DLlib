@@ -13,6 +13,8 @@ private:
     std::vector<size_t> shape;
     std::unique_ptr<void, std::function<void(void*)>> cpu_data;
     std::unique_ptr<void, std::function<void(void*)>> gpu_data;
+    size_t n_elem;
+
 public:
     Tensor(std::initializer_list<size_t>, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
     Tensor(Tensor&, std::shared_ptr<Device> = DeviceManager::get_cpu_device());

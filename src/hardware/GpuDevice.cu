@@ -4,6 +4,7 @@
 #include <cstring>
 
 #ifdef __USE_CUDA__
+#include <cuda.h>
 #include <cuda_runtime.h>
 
 
@@ -42,9 +43,11 @@ void GpuDevice::copy_device_to_device(void* dst, const void* src, size_t size){
 }
 
 void GpuDevice::memset(void* dst, float value, size_t size){
-    uint32_t asRaw = std::memcpy(&asRaw, &value, sizeof(float));
-    cudaError_t err = cudaMemsetD32(std::reinterpret_cast<CudaDevicePtr>(dst), asRaw, size / sizeof(float));
-    if(err != cudaSuccess){
+    uint32_t asRaw = 0; 
+    std::memcpy(&asRaw, &value, sizeof(float));
+    
+    CUresult err = cuMemsetD32(reinterpret_cast<CUdeviceptr>(dst), asRaw, size / sizeof(float));
+    if(err != CUDA_SUCCESS){
         throw std::runtime_error("Failed to set GPU memory");
     }
 }

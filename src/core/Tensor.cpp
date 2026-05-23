@@ -8,7 +8,7 @@ Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> devic
     for(auto it = shape.begin(); it != shape.end(); it++){
         total_size*=*it;
     }
-
+    this->n_elem = total_size;
     //Data initialization
     void* data_ptr = device->allocate(total_size * sizeof(float));
     if(data_ptr == nullptr){
@@ -30,6 +30,9 @@ Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device) {
     for(auto it = t.shape.begin(); it != t.shape.end(); it++){
         total_size*=*it;
     }
+
+    this->n_elem = total_size;
+
     void* data_ptr = device->allocate(total_size * sizeof(float));
     if(data_ptr == nullptr){
         throw std::runtime_error("Failed memory allocation");
@@ -51,10 +54,8 @@ const float* Tensor::data() const{
 void Tensor::to(std::shared_ptr<Device> device){
     if(this->device->get_type() == device->get_type()) return;
     
-    size_t total_data = 1;
-    for(auto it = this->shape.begin(); it != this->shape.end(); it++){
-        total_data*=*it;
-    }
+    size_t total_data = this->n_elem;
+    
     void* data_ptr = device->allocate(total_data * sizeof(float));
     if(data_ptr == nullptr){
         throw std::runtime_error("Failed memory allocation");
