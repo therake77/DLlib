@@ -8,9 +8,9 @@
 #include <cuda_runtime.h>
 
 
-void* GpuDevice::allocate(size_t size){
+void* GpuDevice::allocate(size_t _n_bytes){
     void* ptr;
-    cudaError_t err = cudaMalloc(&ptr, size);
+    cudaError_t err = cudaMalloc(&ptr, _n_bytes);
     if(err != cudaSuccess){
         throw std::runtime_error("Failed to allocate GPU memory");
     }

@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 #ifdef __USE_CUDA__
-    #include <hardware/GpuDevice.hpp>
+    #include <hardware/GpuDevice.cuh>
 #endif  //__USE_CUDA__
 
 std::shared_ptr<Device> DeviceManager::get_cpu_device() {

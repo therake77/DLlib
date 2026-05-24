@@ -15,7 +15,7 @@ if(CMAKE_CUDA_COMPILER)
     find_package(CUDAToolkit REQUIRED)
     add_compile_definitions(__USE_CUDA__)
 
-    else()
+else()
     message(WARNING "CUDA compiler not found. GPU support will be disabled.")
 endif()
 
@@ -44,3 +44,4 @@ target_include_directories(cnn_lib PUBLIC include)
 
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
+target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
