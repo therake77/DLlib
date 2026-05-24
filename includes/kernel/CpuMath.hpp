@@ -2,26 +2,26 @@
 
 namespace CpuMath{
 
-    void add(float* a, float* b, size_t size, float* out);
-    void sub(float* a, float* b, size_t size, float* out);
-    void scale(float* a, size_t size, float _n, float* out);
-    void multiply(float* a, float* b, size_t size, float* out);
+    void add(const float* a, const float* b, size_t size, float* out);
+    void sub(const float* a, const float* b, size_t size, float* out);
+    void scale(const float* a, size_t size, float _n, float* out);
+    void multiply(const float* a, const float* b, size_t size, float* out);
 
     //Linear Algebra
-    void matmul(float* a, std::vector<size_t> a_shape, float* b, std::vector<size_t> b_shape, float* out);
+    void matmul(const float* a, std::vector<size_t> a_shape, const float* b, std::vector<size_t> b_shape, float* out);
     //Still researching about it
-    void conv(float* in, std::vector<size_t> in_shape, float* ker, std::vector<size_t> ker_shape, float* out, size_t stride, size_t padding);
+    void conv(const float* in, std::vector<size_t> in_shape, const float* ker, std::vector<size_t> ker_shape, float* out, size_t stride, size_t padding);
 
     //Activation functions
-    void reLU(float* a, size_t size, float* out);
-    void sigmoid(float* a, size_t size, float* out);
-    void tanh(float* a, size_t size, float* out);
-    void softmax(float* a, size_t size, float* out);
+    void reLU(const float* a, size_t size, float* out);
+    void sigmoid(const float* a, size_t size, float* out);
+    void tanh(const float* a, size_t size, float* out);
+    void softmax(const float* a, size_t size, float* out);
     
     //Structural ops and reshaping
-    void sum(float* a, std::vector<size_t> shape, size_t axis, float* out);
+    void sum(const float* a, std::vector<size_t> shape, size_t axis, float* out);
     //TODO(Do we really need a reshape at this level?)
-    void reshape(float* a, std::vector<size_t> shape, std::vector<size_t> new_shape, float* out);
-    void transpose(float* a, std::vector<size_t> shape, float* out);
+    void reshape(const float* a, std::vector<size_t> shape, std::vector<size_t> new_shape, float* out);
+    void transpose(const float* a, std::vector<size_t> shape, float* out);
 
 };
