@@ -36,6 +36,29 @@ Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> devic
     }
 }
 
+Tensor::Tensor(const std::vector<size_t>& args, std::shared_ptr<Device> device)
+: shape(args), device(device), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}), n_elem(compute_total_size(shape)) {
+
+    void* data_ptr = this->device->allocate(n_elem * sizeof(float));
+    if(data_ptr == nullptr){
+        throw std::runtime_error("Failed to allocate memory for tensor");
+    }
+    this->device->memset(data_ptr, 1.0f, n_elem * sizeof(float));
+
+    auto curr_dev = this->device;
+    auto deleter = [curr_dev](void* ptr){
+        curr_dev->free(ptr);
+    };
+
+    if(this->device->get_type() == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->gpu_data.reset();
+    }else{
+        this->gpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->cpu_data.reset();
+    }
+}
+
 Tensor::Tensor(const Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}), n_elem(t.n_elem) {
 
     void* data_ptr = this->device->allocate(n_elem * sizeof(float));

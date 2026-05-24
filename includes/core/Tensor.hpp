@@ -17,6 +17,7 @@ private:
 
 public:
     Tensor(std::initializer_list<size_t> shape, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
+    Tensor(const std::vector<size_t>& shape, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
     Tensor(const Tensor& other, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
     const float* data() const;
     float* data();
