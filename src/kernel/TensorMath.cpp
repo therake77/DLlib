@@ -1,6 +1,6 @@
 #include <kernel/TensorMath.hpp>
 #include <kernel/CpuMath.hpp>
-#include <kernel/GpuMath.hpp>
+#include <kernel/GpuMath.cuh>
 #include <stdexcept>
 #include <string>
 
