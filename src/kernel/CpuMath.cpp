@@ -1,5 +1,6 @@
 #include <kernel/TensorMath.hpp>
 #include <stdexcept>
+#include <cmath>
 
 namespace {
 	void validate_cpu_pair(const Tensor& a, const Tensor& b, const Tensor& out) {
@@ -67,6 +68,64 @@ namespace BaseMath {
 		float* out_data = out.data();
 		for (size_t i = 0; i < out.size(); ++i) {
 			out_data[i] = a_data[i] * b_data[i];
+		}
+	}
+
+	void reLU(Tensor& a, Tensor& out) {
+		validate_cpu_single(a, out);
+		const float* a_data = a.data();
+		float* out_data = out.data();
+		for (size_t i = 0; i < out.size(); ++i) {
+			out_data[i] = a_data[i] > 0.0f ? a_data[i] : 0.0f;
+		}
+	}
+
+	void sigmoid(Tensor& a, Tensor& out) {
+		validate_cpu_single(a, out);
+		const float* a_data = a.data();
+		float* out_data = out.data();
+		for (size_t i = 0; i < out.size(); ++i) {
+			out_data[i] = 1.0f / (1.0f + std::exp(-a_data[i]));
+		}
+	}
+
+	void tanh(Tensor& a, Tensor& out) {
+		validate_cpu_single(a, out);
+		const float* a_data = a.data();
+		float* out_data = out.data();
+		for (size_t i = 0; i < out.size(); ++i) {
+			out_data[i] = std::tanh(a_data[i]);
+		}
+	}
+
+	void softmax(Tensor& a, Tensor& out) {
+		validate_cpu_single(a, out);
+		const float* a_data = a.data();
+		float* out_data = out.data();
+		if (out.size() == 0) {
+			return;
+		}
+
+		float max_val = a_data[0];
+		for (size_t i = 1; i < out.size(); ++i) {
+			if (a_data[i] > max_val) {
+				max_val = a_data[i];
+			}
+		}
+
+		float sum = 0.0f;
+		for (size_t i = 0; i < out.size(); ++i) {
+			out_data[i] = std::exp(a_data[i] - max_val);
+			sum += out_data[i];
+		}
+
+		if (sum == 0.0f) {
+			return;
+		}
+
+		float inv_sum = 1.0f / sum;
+		for (size_t i = 0; i < out.size(); ++i) {
+			out_data[i] *= inv_sum;
 		}
 	}
 }

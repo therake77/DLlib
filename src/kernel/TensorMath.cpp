@@ -46,4 +46,32 @@ namespace TensorMath {
 		BaseMath::multiply(a, b, out);
 		return out;
 	}
+
+	Tensor reLU(Tensor& a) {
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::reLU(a, out);
+		return out;
+	}
+
+	Tensor sigmoid(Tensor& a) {
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::sigmoid(a, out);
+		return out;
+	}
+
+	Tensor tanh(Tensor& a) {
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::tanh(a, out);
+		return out;
+	}
+
+	Tensor softmax(Tensor& a) {
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::softmax(a, out);
+		return out;
+	}
 }
