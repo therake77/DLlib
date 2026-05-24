@@ -10,19 +10,20 @@
 class Tensor{
 private:
     std::shared_ptr<Device> device;
-    std::vector<size_t> shape;
+    std::vector<size_t> _shape;
     std::unique_ptr<void, std::function<void(void*)>> cpu_data;
     std::unique_ptr<void, std::function<void(void*)>> gpu_data;
-    size_t n_elem;
+    size_t _size;
 
 public:
-    Tensor(std::initializer_list<size_t> shape, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
-    Tensor(const std::vector<size_t>& shape, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
-    Tensor(const Tensor& other, std::shared_ptr<Device> device = DeviceManager::get_cpu_device());
-    const float* data() const;
+    const size_t& size = _size;
+    const std::vector<size_t>& shape = _shape;
+
+    Tensor(std::initializer_list<size_t>, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
+    Tensor(std::vector<size_t> shape, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float _fill = 0.0f);
+    Tensor(Tensor&, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
     float* data();
-    void to(std::shared_ptr<Device> device);
-    const std::vector<size_t>& get_shape() const;
-    size_t size() const;
-    std::shared_ptr<Device> get_device() const;
+    const float* data() const;
+    void to(std::shared_ptr<Device>);
+    const inline std::shared_ptr<Device>& getDevice() const { return this->device; }
 };
