@@ -2,15 +2,37 @@
 #include <stdexcept>
 #include <cstring>
 
-Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> device)
-: Tensor(std::vector<size_t>(args),device,0.0f){}
+Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> device, float _fill)
+: Tensor(std::vector<size_t>(args),device,_fill){}
 
-Tensor::Tensor(std::vector<size_t> shape, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float _fill = 0.0f)
-: _shape(shape.begin(),shape.end()), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
+Tensor::Tensor(std::vector<size_t> shape_, std::shared_ptr<Device> device, float _fill)
+: _shape(shape_.begin(),shape_.end()), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
+    
     size_t total_size = 1;
-    for(auto it = shape.begin(); it != shape.end(); it++){
+    for(auto it = _shape.begin(); it != _shape.end(); it++){
         total_size*=*it;
     }
+    
+    this->_size = total_size;
+    auto currDev = this->device.get();
+    void* data_ptr = currDev->allocate(total_size * sizeof(float));
+    if( data_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
+    
+    currDev->memset(data_ptr,_fill,total_size);
+    
+    auto deleter =  [currDev](void* p){
+        currDev->free(p);
+    };
+
+    DeviceType type = this->device.get()->get_type();
+    if(type == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr,deleter);
+    }else{
+        this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr,deleter);
+    }
+
 }
 
 Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}), _size(t.size) {

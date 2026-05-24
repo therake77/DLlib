@@ -2,8 +2,8 @@
 #include <stdexcept>
 #include <cstring>
 
-void* CpuDevice::allocate(size_t size){
-    return std::malloc(size);
+void* CpuDevice::allocate(size_t _n_bytes){
+    return std::malloc(_n_bytes);
 }
 
 void CpuDevice::free(void* ptr){
@@ -22,8 +22,8 @@ void CpuDevice::copy_device_to_device(void* dst, const void* src, size_t size){
     std::memcpy(dst, src, size);
 }
 
-void CpuDevice::memset(void* dst, float value, size_t size){
-    std::fill_n(static_cast<float*>(dst), size / sizeof(float),value);
+void CpuDevice::memset(void* dst, float value, size_t _n){
+    std::fill_n(static_cast<float*>(dst), _n,value);
 }
 
 DeviceType CpuDevice::get_type() const {

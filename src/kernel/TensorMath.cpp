@@ -87,8 +87,8 @@ Tensor TensorMath::softmax(Tensor& a) {
 
 //Linear Algebra
 Tensor TensorMath::matmul(Tensor& a, Tensor& b) {
-    const auto& a_shape = a.shape;
-    const auto& b_shape = b.shape;
+    const auto a_shape = a.shape;
+    const auto b_shape = b.shape;
     if (a_shape.size() != 2 || b_shape.size() != 2) {
         throw std::runtime_error("matmul requires 2D tensors");
     }
