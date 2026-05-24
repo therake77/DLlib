@@ -1,5 +1,49 @@
 #include <kernel/TensorMath.hpp>
+#include <stdexcept>
 
-void BaseMath::add(Tensor& a, Tensor& b, Tensor& out){
-    
+namespace {
+	void ensure_same_shape(const Tensor& a, const Tensor& b) {
+		if (a.size() != b.size() || a.get_shape() != b.get_shape()) {
+			throw std::runtime_error("Tensor shape mismatch");
+		}
+	}
+
+	void ensure_cpu_only(const Tensor& a) {
+		if (a.get_device()->get_type() != DeviceType::CPU) {
+			throw std::runtime_error("GPU backend not implemented yet");
+		}
+	}
+}
+
+namespace TensorMath {
+	Tensor add(Tensor& a, Tensor& b) {
+		ensure_same_shape(a, b);
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::add(a, b, out);
+		return out;
+	}
+
+	Tensor sub(Tensor& a, Tensor& b) {
+		ensure_same_shape(a, b);
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::sub(a, b, out);
+		return out;
+	}
+
+	Tensor scale(Tensor& a, float n) {
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::scale(a, n, out);
+		return out;
+	}
+
+	Tensor multiply(Tensor& a, Tensor& b) {
+		ensure_same_shape(a, b);
+		ensure_cpu_only(a);
+		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
+		BaseMath::multiply(a, b, out);
+		return out;
+	}
 }
