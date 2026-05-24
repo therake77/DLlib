@@ -16,8 +16,13 @@ private:
     size_t n_elem;
 
 public:
+    const size_t& size = n_elem;
+
     Tensor(std::initializer_list<size_t>, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
+    Tensor(std::vector<size_t> shape, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float _fill = 0.0f);
     Tensor(Tensor&, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
-    const float* data() const;
+    float* data();
     void to(std::shared_ptr<Device>);
+    const inline std::vector<size_t> getShape() const { return this->shape; }
+    const inline std::shared_ptr<Device>& getDevice() const { return this->device; }
 };
