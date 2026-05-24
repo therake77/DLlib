@@ -3,7 +3,10 @@
 #include <cstring>
 
 Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> device)
-: shape(args.begin(),args.end()), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr) {
+: Tensor(std::vector<size_t>(args),device,0.0f){}
+
+Tensor::Tensor(std::vector<size_t> shape, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float _fill = 0.0f)
+: shape(shape.begin(),shape.end()), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
     size_t total_size = 1;
     for(auto it = shape.begin(); it != shape.end(); it++){
         total_size*=*it;
@@ -17,12 +20,21 @@ Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> devic
     this->device->memset(data_ptr, 1.0f, total_size * sizeof(float));
 
     auto curr_dev = this->device;
-    this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(
-        data_ptr,
-        [curr_dev](void* ptr){
-            curr_dev->free(ptr);
-        }
-    );
+    if(device.get()->get_type() == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(
+            data_ptr,
+            [curr_dev](void* ptr){
+                curr_dev->free(ptr);
+            }
+        );
+    }else{
+        this->gpu_data = std::unique_ptr<void,std::function<void(void*)>>(
+            data_ptr,
+            [curr_dev](void* ptr){
+                curr_dev->free(ptr);
+            }
+        );
+    }
 }
 
 Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device) {
@@ -46,8 +58,12 @@ Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device) {
     );
 }
 
-const float* Tensor::data() const{
-    return static_cast<const float*>(this->cpu_data.get());
+float* Tensor::data(){
+    if( this->device.get()->get_type() == DeviceType::CPU){
+        return static_cast<float*>(this->cpu_data.get());
+    }else{
+        return static_cast<float*>(this->gpu_data.get());
+    }
 }
 
 //TODO(Still tests are needed)
