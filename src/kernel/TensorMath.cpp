@@ -16,6 +16,7 @@ namespace {
 }
 
 namespace TensorMath {
+    //Element-wise operations
 	Tensor add(Tensor& a, Tensor& b) {
 		ensure_same_shape(a, b);
 		ensure_cpu_only(a);
@@ -47,6 +48,7 @@ namespace TensorMath {
 		return out;
 	}
 
+    //Activation functions
 	Tensor reLU(Tensor& a) {
 		ensure_cpu_only(a);
 		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
@@ -72,6 +74,52 @@ namespace TensorMath {
 		ensure_cpu_only(a);
 		Tensor out(std::vector<size_t>(a.get_shape()), a.get_device());
 		BaseMath::softmax(a, out);
+		return out;
+	}
+
+    //Linear Algebra
+	Tensor matmul(Tensor& a, Tensor& b) {
+		ensure_cpu_only(a);
+		ensure_cpu_only(b);
+		const auto& a_shape = a.get_shape();
+		const auto& b_shape = b.get_shape();
+		if (a_shape.size() != 2 || b_shape.size() != 2) {
+			throw std::runtime_error("matmul requires 2D tensors");
+		}
+		if (a_shape[1] != b_shape[0]) {
+			throw std::runtime_error("matmul shape mismatch");
+		}
+		std::vector<size_t> out_shape = { a_shape[0], b_shape[1] };
+		Tensor out(out_shape, a.get_device());
+		BaseMath::matmul(a, b, out);
+		return out;
+	}
+
+	Tensor conv(Tensor& in, Tensor& ker, size_t stride, size_t padding) {
+		ensure_cpu_only(in);
+		ensure_cpu_only(ker);
+		const auto& in_shape = in.get_shape();
+		const auto& ker_shape = ker.get_shape();
+		if (in_shape.size() != 2 || ker_shape.size() != 2) {
+			throw std::runtime_error("conv requires 2D tensors");
+		}
+		size_t in_h = in_shape[0];
+		size_t in_w = in_shape[1];
+		size_t k_h = ker_shape[0];
+		size_t k_w = ker_shape[1];
+		size_t padded_h = in_h + 2 * padding;
+		size_t padded_w = in_w + 2 * padding;
+		if (padded_h < k_h || padded_w < k_w) {
+			throw std::runtime_error("conv kernel larger than input");
+		}
+		if (((padded_h - k_h) % stride) != 0 || ((padded_w - k_w) % stride) != 0) {
+			throw std::runtime_error("conv stride/padding mismatch");
+		}
+		size_t out_h = (padded_h - k_h) / stride + 1;
+		size_t out_w = (padded_w - k_w) / stride + 1;
+		std::vector<size_t> out_shape = { out_h, out_w };
+		Tensor out(out_shape, in.get_device());
+		BaseMath::conv(in, ker, out, stride, padding);
 		return out;
 	}
 }
