@@ -27,15 +27,16 @@ set(SRC_FILES
     src/core/ConvLayer.cpp
     src/core/Pooling.cpp
     src/core/Tensor.cpp
+    src/core/Shape.cpp
     src/hardware/CpuDevice.cpp
     src/hardware/DeviceManager.cpp
-    src/kernel/CpuMath.cpp
-    src/kernel/GpuMath.cu
-    src/kernel/TensorMath.cpp
+    src/math/CpuMath.cpp
+    src/math/TensorMath.cpp
 )
 
 if(CMAKE_CUDA_COMPILER)
     list(APPEND SRC_FILES src/hardware/GpuDevice.cu)
+    list(APPEND SRC_FILES src/math/GpuMath.cu )
 endif()
 
 add_library(cnn_lib STATIC ${SRC_FILES})

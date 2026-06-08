@@ -1,5 +1,5 @@
 #include <hardware/Device.hpp>
-
+#include <math/GpuMath.cuh>
 #ifdef __USE_CUDA__
 
 class GpuDevice : public Device {
@@ -7,6 +7,8 @@ public:
 
     ~GpuDevice() override = default;
     
+    GpuDevice(){ this->math = std::make_unique<GpuMath>(); }
+
     void* allocate(size_t size) override;
     void free(void* ptr) override;
     
