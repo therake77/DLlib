@@ -3,6 +3,7 @@
 #include <math/CpuMath.hpp>
 #include <vector>
 #include <cassert>
+#include <string>
 
 namespace{
     /* Probably would be use for something in the future*/
@@ -36,7 +37,13 @@ namespace{
         }
     }
 
-    /*Given the shape of a kernel, transforms the input in a new matrix such that each possible kernel window looks as a row*/
+    /*
+    Given the shape of a kernel, transforms the input in a new matrix such that each possible kernel window looks as a row
+    Expects: 
+    The input with shape (Batch ,Channel ,S_0,...,S_n) with S_i spatial dimensions of the convolution
+    A kernel of shape (C_out, Channel, S'_0, ... , S'_n) with S'_i spatial dimensions of the kernel 
+    A output of shape ()
+    */
     void im2col(
         const float* input,
         const Shape& input_shape,
@@ -174,21 +181,30 @@ void CpuMath::matmul(
 
 }
 
-
+/*
+Convolution in 2 dimensions. 
+Expects:
+- Float data pointer of a tensor input `in` with shape (Batch, Channel, Height, Width)
+- Float data pointer of a tensor kernel `ker` with shape (N_kernels, Channel, Ker_height, Ker_width )
+- Nonconst float data pointer of a tensor `out` with shape (Batch, N_kernels, Out_height, Out_width)
+*/
 void CpuMath::conv2D(
     const float* in, Shape in_shape,
     const float* ker, Shape ker_shape,
-    float out, Shape out_shape,
-    size_t stride, size_t padding
+    float* out, Shape out_shape,
+    std::array<size_t,2> stride, std::array<size_t,2> padding
 ) {
+    //Basic validation: Dimensions
+    if( in_shape.n_dim != 4 || in_shape.n_dim!=ker_shape.n_dim || in_shape.n_dim!=out_shape.n_dim ){ throw std::runtime_error("Error: Expected 4D tensors"); }
+
 
 }
 
 void CpuMath::conv3D(
     const float* in, Shape in_shape,
     const float* ker, Shape ker_shape,
-    float out, Shape out_shape,
-    size_t stride, size_t padding
+    float* out, Shape out_shape,
+    std::array<size_t,3> stride, std::array<size_t,3> padding
 ) {
 
 }

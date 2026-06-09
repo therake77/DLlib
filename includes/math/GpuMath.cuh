@@ -18,14 +18,14 @@ public:
     void conv2D(
         const float* in, Shape in_shape,
         const float* ker, Shape ker_shape,
-        float out, Shape out_shape,
-        size_t stride, size_t padding
+        float* out, Shape out_shape,
+        std::array<size_t,2> stride, std::array<size_t,2> padding
     ) override;
     void conv3D(
         const float* in, Shape in_shape,
         const float* ker, Shape ker_shape,
-        float out, Shape out_shape,
-        size_t stride, size_t padding
+        float* out, Shape out_shape,
+        std::array<size_t,3> stride, std::array<size_t,3> padding
     ) override;
     void reLU(const float* a, float* out, size_t n_elements) override;
     void sigmoid(const float* a, float* out, size_t n_elements) override;

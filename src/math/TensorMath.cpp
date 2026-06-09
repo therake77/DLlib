@@ -81,6 +81,10 @@ namespace{
         }
     }
 
+    void _check_conv2D_shapes(Shape& a, Shape& b, Shape& out){
+
+    }
+
 };
 
 void TensorMath::add(Tensor& a, Tensor&b, Tensor& out){
@@ -115,6 +119,7 @@ void TensorMath::multiply(Tensor& a, Tensor& b, Tensor& out){
     _ensure_same_device(b,out,DeviceType::CPU);
 
 }
+
 /*Matmul routine*/
 void TensorMath::matmul(Tensor& a , Tensor& b , Tensor& out){
     
@@ -151,11 +156,24 @@ void TensorMath::matmul(Tensor& a , Tensor& b , Tensor& out){
 
     //Finish
 }
-
+/*
+Convolution operation.
+Expects 4D tensors. No exceptions allowed.
+*/
 void TensorMath::conv2D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding){
+    //Device guards
+    _ensure_same_device(in,ker,DeviceType::CPU);
+    _ensure_same_device(ker,out,DeviceType::CPU);
+    //Ensure all tensors are EXACTLY 4D
+    if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
+    /*
+    Process.
+    Allocate memory for a Tensor of shape ()
+    */
 
 
 }
+
 
 void TensorMath::conv3D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding){}
 

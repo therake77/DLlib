@@ -15,14 +15,14 @@ void GpuMath::matmul(
 void GpuMath::conv2D(
     const float* in, Shape in_shape,
     const float* ker, Shape ker_shape,
-    float out, Shape out_shape,
-    size_t stride, size_t padding
+    float* out, Shape out_shape,
+    std::array<size_t,2> stride, std::array<size_t,2> padding
 ) { return; }
 void GpuMath::conv3D(
     const float* in, Shape in_shape,
     const float* ker, Shape ker_shape,
-    float out, Shape out_shape,
-    size_t stride, size_t padding
+    float* out, Shape out_shape,
+    std::array<size_t,3> stride, std::array<size_t,3> padding
 ) { return; }
 void GpuMath::reLU(const float* a, float* out, size_t n_elements) { return; }
 void GpuMath::sigmoid(const float* a, float* out, size_t n_elements) { return; }
