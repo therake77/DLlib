@@ -36,7 +36,7 @@ Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shap
     auto src_type = t.getDevice().get()->get_type();
     auto dst_type = this->device->get_type();
 
-    size_t _size = shape.n_dim;
+    size_t _size = shape.n_elements;
 
     if(src_type == DeviceType::CPU && dst_type == DeviceType::CPU){
         std::memcpy(data_ptr, t.data(), _size * sizeof(float));
