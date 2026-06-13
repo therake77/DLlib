@@ -232,3 +232,68 @@ void CpuMath::sum(
 ) {
 
 }
+
+void CpuMath::transpose(
+    const float* in, const Shape& in_shape,
+    float* out, const Shape& out_shape
+) {
+    if(in_shape.n_dim != out_shape.n_dim){
+        throw std::runtime_error("Error: transpose requires matching tensor ranks");
+    }
+    if(in_shape.n_dim < 2){
+        std::memcpy(out, in, in_shape.n_elements * sizeof(float));
+        return;
+    }
+
+    std::array<size_t, TENSOR_MAX_DIM> expected_out = in_shape._shapes;
+
+    size_t last = in_shape.n_dim - 1;
+    size_t prev = in_shape.n_dim - 2;
+
+    size_t tmp = expected_out[prev];
+    expected_out[prev] = expected_out[last];
+    expected_out[last] = tmp;
+
+    if(expected_out != out_shape._shapes){
+        throw std::runtime_error("Error: transpose output shape mismatch");
+    }
+
+    auto index_from_coords = [](const Shape& shape, const std::array<size_t, TENSOR_MAX_DIM>& c){
+        size_t idx = 0;
+        for(size_t i = 0; i < shape.n_dim; ++i){
+            idx += c[i] * shape._strides[i];
+        }
+        return idx;
+    };
+
+    std::array<size_t, TENSOR_MAX_DIM> coords{};
+    coords.fill(0);
+
+    for(size_t processed = 0; processed < out_shape.n_elements; ++processed){
+        size_t src_idx = 0;
+
+        for(size_t i = 0; i < in_shape.n_dim; ++i){
+            size_t coord;
+            if(i == prev){
+                coord = coords[last];
+            } else if(i == last){
+                coord = coords[prev];
+            } else{
+                coord = coords[i];
+            }
+            src_idx += coord * in_shape._strides[i];
+        }
+
+        size_t dst_idx = index_from_coords(out_shape, coords);
+        out[dst_idx] = in[src_idx];
+
+        for(size_t dim = out_shape.n_dim; dim > 0; --dim){
+            size_t i = dim - 1;
+            coords[i]++;
+            if(coords[i] < out_shape[i]){
+                break;
+            }
+            coords[i] = 0;
+        }
+    }
+}
