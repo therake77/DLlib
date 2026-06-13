@@ -1,8 +1,12 @@
 #include <hardware/Device.hpp>
+#include <math/CpuMath.hpp>
 
 class CpuDevice : public Device {
 public:
+
     ~CpuDevice() override = default;
+
+    CpuDevice(){ this->math = std::make_unique<CpuMath>(); };
 
     void* allocate(size_t size) override;
     void free(void* ptr) override;

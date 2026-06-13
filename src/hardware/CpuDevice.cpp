@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <cstring>
 
+
+
 void* CpuDevice::allocate(size_t _n_bytes){
     return std::malloc(_n_bytes);
 }

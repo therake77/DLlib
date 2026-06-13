@@ -1,7 +1,12 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <math/Math.hpp>
+#include <math/CpuMath.hpp>
 
+#ifdef __USE_CUDA
+    #include <math/GpuMath.cuh>
+#endif
 enum class DeviceType {
     CPU,
     GPU
@@ -9,7 +14,10 @@ enum class DeviceType {
 
 class Device {
 public:
+    std::unique_ptr<Math> math;
     virtual ~Device() = default;
+    Device() = default;
+
     virtual void* allocate(size_t size) = 0;
     virtual void free(void* ptr) = 0;
     

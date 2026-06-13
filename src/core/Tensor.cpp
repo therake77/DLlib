@@ -2,25 +2,16 @@
 #include <stdexcept>
 #include <cstring>
 
-Tensor::Tensor(std::initializer_list<size_t> args, std::shared_ptr<Device> device, float _fill)
-: Tensor(std::vector<size_t>(args),device,_fill){}
-
-Tensor::Tensor(std::vector<size_t> shape_, std::shared_ptr<Device> device, float _fill)
-: _shape(shape_.begin(),shape_.end()), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
+Tensor::Tensor(std::array<size_t,TENSOR_MAX_DIM> _shape, std::shared_ptr<Device> device, float _fill)
+: shape(_shape), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
     
-    size_t total_size = 1;
-    for(auto it = _shape.begin(); it != _shape.end(); it++){
-        total_size*=*it;
-    }
-    
-    this->_size = total_size;
     auto currDev = this->device.get();
-    void* data_ptr = currDev->allocate(total_size * sizeof(float));
+    void* data_ptr = currDev->allocate(shape.n_elements * sizeof(float));
     if( data_ptr == nullptr){
         throw std::runtime_error("Failed memory allocation");
     }
     
-    currDev->memset(data_ptr,_fill,total_size);
+    currDev->memset(data_ptr,_fill,shape.n_elements);
     
     auto deleter =  [currDev](void* p){
         currDev->free(p);
@@ -35,15 +26,17 @@ Tensor::Tensor(std::vector<size_t> shape_, std::shared_ptr<Device> device, float
 
 }
 
-Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}), _size(t.size) {
+Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
 
-    void* data_ptr = this->device->allocate(_size * sizeof(float));
+    void* data_ptr = this->device->allocate(shape.n_elements * sizeof(float));
     if(data_ptr == nullptr){
         throw std::runtime_error("Failed memory allocation");
     }
 
     auto src_type = t.getDevice().get()->get_type();
     auto dst_type = this->device->get_type();
+
+    size_t _size = shape.n_elements;
 
     if(src_type == DeviceType::CPU && dst_type == DeviceType::CPU){
         std::memcpy(data_ptr, t.data(), _size * sizeof(float));
@@ -89,6 +82,8 @@ const float* Tensor::data() const{
 void Tensor::to(std::shared_ptr<Device> device){
     if(this->device->get_type() == device->get_type()) return;
     
+    size_t _size = shape.n_elements;
+
     void* data_ptr = device->allocate(_size * sizeof(float));
     if(data_ptr == nullptr){
         throw std::runtime_error("Failed memory allocation");
