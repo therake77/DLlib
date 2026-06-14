@@ -27,6 +27,8 @@ public:
 
     virtual void memset(void* dst, float value, size_t size) = 0;
     
+    virtual void memset_rand(void*dst, size_t size) = 0;
+
     virtual DeviceType get_type() const = 0;
     virtual std::string get_name() const = 0;
 };

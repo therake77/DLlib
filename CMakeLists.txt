@@ -49,7 +49,12 @@ target_link_libraries(tensor_test PRIVATE cnn_lib)
 add_executable(conv_test tests/conv_test.cpp)
 target_link_libraries(conv_test PRIVATE cnn_lib)
 
+add_executable(conv_layer_test tests/conv_layer_test.cpp)
+target_link_libraries(conv_layer_test PRIVATE cnn_lib)
+
+
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
 endif()

@@ -86,7 +86,7 @@ namespace{
     }
 
 };
-
+/*Function that adds two tensors component-wise. It is safe to put the input argument `a` as `out`*/
 void TensorMath::add(Tensor& a, Tensor&b, Tensor& out){
     _ensure_same_shape(a,b);
     _ensure_same_device(a,b,DeviceType::CPU);
@@ -179,11 +179,35 @@ void TensorMath::conv2D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, siz
         {stride,stride},
         {padding,padding}
     );
-
 }
 
+void TensorMath::conv2D(Tensor& in, Tensor& ker, Tensor& out, std::array<size_t,2> stride, std::array<size_t,2> padding){
+    _ensure_same_device(in,ker,DeviceType::CPU);
+    _ensure_same_device(ker,out,DeviceType::CPU);
+    //Ensure all tensors are EXACTLY 4D
+    if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
+    
+    //Should we implement all guards here?
 
-void TensorMath::conv3D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding){}
+    auto device = in.getDevice();
+    
+    //just call the underlying math function
+    device->math->conv2D(
+        in.data(),in.shape,
+        ker.data(),ker.shape,
+        out.data(),out.shape,
+        stride,
+        padding
+    );
+}
+
+void TensorMath::conv3D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding){
+    throw std::logic_error("Not implemented");
+}
+
+void TensorMath::conv3D(Tensor& in, Tensor& ker, Tensor& out, std::array<size_t,3> stride, std::array<size_t,3> padding){
+
+}
 
 void TensorMath::reLU(Tensor& a, Tensor& out){}
 

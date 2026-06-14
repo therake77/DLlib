@@ -52,6 +52,15 @@ void GpuDevice::memset(void* dst, float value, size_t size){
     }
 }
 
+/*Set `dst` memory region holding `_n` floats with a random float value from [0,1]. 
+`dst` is interpreted always as a float region of memory*/
+void GpuDevice::memset_rand(void* dst, size_t _n){
+    float* f_dst = static_cast<float*>(dst);
+    /*Not implemented yet*/
+    throw std::logic_error("Not implemented");
+}
+
+
 DeviceType GpuDevice::get_type() const {
     return DeviceType::GPU;
 }

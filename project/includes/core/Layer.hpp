@@ -2,10 +2,10 @@
 #include <core/Tensor.hpp>
 
 class Layer{
-protected:
-    virtual Tensor forward(Tensor);
-    virtual void update_weights(Tensor);
-    
+public:
+    virtual ~Layer() = default;
+    virtual Tensor forward(Tensor) = 0;
+    virtual void update_weights(Tensor) = 0;
 };
 
 
@@ -13,8 +13,8 @@ class Pooling : public Layer{
 protected:
     int pool_size;
     int stride;
-    virtual float pool_patch();
-    virtual void backprop_patch();
+    virtual float pool_patch() = 0;
+    virtual void backprop_patch() = 0;
 
 public:
     Tensor forward(Tensor) override;

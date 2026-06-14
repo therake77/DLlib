@@ -1,7 +1,7 @@
 #include <hardware/CpuDevice.hpp>
 #include <stdexcept>
 #include <cstring>
-
+#include <random>
 
 
 void* CpuDevice::allocate(size_t _n_bytes){
@@ -24,8 +24,23 @@ void CpuDevice::copy_device_to_device(void* dst, const void* src, size_t size){
     std::memcpy(dst, src, size);
 }
 
+/*Set `dst` memory region holding `_n` floats with a fixed float value. 
+`dst` is interpreted always as a float region of memory*/
 void CpuDevice::memset(void* dst, float value, size_t _n){
     std::fill_n(static_cast<float*>(dst), _n,value);
+}
+
+/*Set `dst` memory region holding `_n` floats with a random float value from [0,1]. 
+`dst` is interpreted always as a float region of memory*/
+void CpuDevice::memset_rand(void* dst, size_t _n){
+    float* f_dst = static_cast<float*>(dst);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(0.0f,1.0f);
+
+    for(size_t i = 0 ; i < _n; i++){
+        f_dst[i] = dist(gen); 
+    }
 }
 
 DeviceType CpuDevice::get_type() const {
