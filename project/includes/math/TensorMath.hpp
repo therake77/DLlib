@@ -10,6 +10,10 @@ namespace TensorMath {
     void conv2D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding);
     void conv3D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, size_t padding);
 
+    void conv2D(Tensor& in, Tensor& ker, Tensor& out, std::array<size_t,2> stride, std::array<size_t,2> padding);
+    void conv3D(Tensor& in, Tensor& ker, Tensor& out, std::array<size_t,3> stride, std::array<size_t,3> padding);
+    
+
     void reLU(Tensor& a, Tensor& out);
     void sigmoid(Tensor& a, Tensor& out);
     void tanh(Tensor& a, Tensor& out);
