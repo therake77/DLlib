@@ -39,6 +39,9 @@ void fancy_print(Tensor& a){
     }
 }
 
+void log(std::string s){
+    std::cout<<s<<std::endl;
+}
 
 int main(){
     std::cout<<" Conv2D Test "<<std::endl;
@@ -52,9 +55,14 @@ int main(){
         {1,1,3,3},device_shared_ptr,1.0f
     );
     Tensor output = Tensor(
-        {1,1,2,2},device_shared_ptr,0.0f
+        {1,1,4,4},device_shared_ptr,0.0f
     );
-    TensorMath::conv2D(input,kernel,output,1,0);
+    TensorMath::conv2D(input,kernel,output,1,1);
+    log("Input:");
+    fancy_print(input);
+    log("Kernel:");
+    fancy_print(kernel);
+    log("Output:");
     fancy_print(output);
     return 0;
 }
