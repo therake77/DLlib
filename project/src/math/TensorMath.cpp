@@ -166,11 +166,19 @@ void TensorMath::conv2D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, siz
     _ensure_same_device(ker,out,DeviceType::CPU);
     //Ensure all tensors are EXACTLY 4D
     if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
-    /*
-    Process.
-    Allocate memory for a Tensor of shape ()
-    */
+    
+    //Should we implement all guards here?
 
+    auto device = in.getDevice();
+    
+    //just call the underlying math function
+    device->math->conv2D(
+        in.data(),in.shape,
+        ker.data(),ker.shape,
+        out.data(),out.shape,
+        {stride,stride},
+        {padding,padding}
+    );
 
 }
 
