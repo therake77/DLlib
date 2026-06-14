@@ -3,7 +3,9 @@
 #include <math/CpuMath.hpp>
 #include <vector>
 #include <cassert>
+#include <algorithm>
 #include <string>
+#include <limits>
 
 namespace{
     /* Probably would be use for something in the future*/
@@ -37,46 +39,31 @@ namespace{
         }
     }
 
-    /*
-    Given the shape of a kernel, transforms the input in a new matrix such that each possible kernel window looks as a row
-    Expects: 
-    The input with shape (Batch ,Channel ,S_0,...,S_n) with S_i spatial dimensions of the convolution
-    A kernel of shape (C_out, Channel, S'_0, ... , S'_n) with S'_i spatial dimensions of the kernel 
-    A output of shape ()
-    */
-    void im2col(
-        const float* input,
-        const Shape& input_shape,
-        const Shape& kernel_shape,
-        const std::vector<int>& padding,
-        const std::vector<int>& stride,
-        float* output,
-        const Shape& out_shape
-    ){
-        assert( input_shape.n_dim == kernel_shape.n_dim && input_shape.n_dim == padding.size() && input_shape.n_dim == stride.size() );
-        size_t input_ndims = input_shape.n_dim;
-        if( input_ndims < 2 ){ throw std::runtime_error("Error: The input is 1D or less"); }
-        size_t spatial_dims = input_ndims - 2;
-        size_t batch = input_shape._shapes[0];
-        size_t channels = input_shape._shapes[1];
-
-        //Validation
-        if(kernel_shape._shapes[1] != channels){ throw std::runtime_error("Error: Kernel input channel dim must match image channel dim"); }
-        if(out_shape._shapes[0] != batch){ throw std::runtime_error("Error: Output batch size must match input batch size"); }
-        if(out_shape._shapes[1] != kernel_shape._shapes[0]){ throw std::runtime_error("Output channel dim must match kernel output channel dim"); }
-
-        size_t total_out_spatial_elements = 1;
-        size_t total_kernel_spatial_elements = 1;
-        for(size_t i = 0; i < spatial_dims; ++i){
-            size_t k_spatial_size = kernel_shape._shapes[2+i];
-            size_t input_spatial_size = input_shape._shapes[2+i];
-            size_t expected = (input_spatial_size + 2* padding[i] - k_spatial_size)/stride[i] +  1;
-            if(out_shape._shapes[2+i] != expected){ throw std::runtime_error("Error: Unexpected output dimension"); }
-
-            total_out_spatial_elements *= out_shape._shapes[2+i];
-            total_kernel_spatial_elements*=k_spatial_size;
+    bool _increment_odometer(std::vector<size_t>& coords, std::array<size_t,TENSOR_MAX_DIM> shape){
+        for(size_t i = coords.size(); i --> 0 ;){
+            //guard against overflow
+            if(coords[i] == SIZE_MAX){ throw std::runtime_error("Error: Overflow detected"); }
+            //try incrementing it
+            coords[i]++;
+            //If the increment don't exceed the current dimension, then just break (returning true)
+            if(coords[i] < shape[i]){
+                return true;
+            }else{ //Else, go back the coordinate to zero
+                coords[i] = 0;
+            }
+            //And in the next loop, the next dimension would be incremented
         }
-        
+        //If the loop doesn't break and finishes, that means all coords are zero and the odometer has "overflowed". 
+        // There is no element next.
+        return false;
+    }
+
+    size_t _compute_idx_from_coords(std::vector<size_t> coords, std::array<size_t,TENSOR_MAX_DIM> strides ){
+        size_t offset = 0;
+        for(size_t i = 0; i < coords.size();i ++){
+            offset += (coords[i] * strides[i]);
+        }
+        return offset;
     }
 
 };
@@ -189,15 +176,67 @@ Expects:
 - Nonconst float data pointer of a tensor `out` with shape (Batch, N_kernels, Out_height, Out_width)
 */
 void CpuMath::conv2D(
-    const float* in, Shape in_shape,
-    const float* ker, Shape ker_shape,
-    float* out, Shape out_shape,
+    const float* in, const Shape in_shape,
+    const float* ker, const Shape ker_shape,
+    float* out, const Shape out_shape,
     std::array<size_t,2> stride, std::array<size_t,2> padding
 ) {
-    //Basic validation: Dimensions
+    //Basic validation:
+    //Dimensions
     if( in_shape.n_dim != 4 || in_shape.n_dim!=ker_shape.n_dim || in_shape.n_dim!=out_shape.n_dim ){ throw std::runtime_error("Error: Expected 4D tensors"); }
+    //Shapes
+    size_t batch = in_shape[0];
+    size_t channel = in_shape[1];
+    size_t n_kernels = ker_shape[0];
+    if( 
+        batch != out_shape[0] ||
+        channel != ker_shape[1] ||
+        n_kernels != out_shape[1]
+    ){ 
+        std::runtime_error("Error: Shape inconsistency");
+    }
 
+    /*This is stack memory. With the assumption of no big kernels, this is tolerable*/
+    size_t patch_size = ker_shape[1] * ker_shape[2] * ker_shape[3]; //C x KH x KW 
+    std::vector<float> patch(patch_size,0);
 
+    std::vector<size_t> out_coords(out_shape.n_dim,0);
+    std::vector<size_t> kernel_coords(ker_shape.n_dim,0);
+    std::vector<size_t> patch_coords(3,0);
+    std::array<size_t,TENSOR_MAX_DIM> patch_shapes = {channel, ker_shape._shapes[2], ker_shape._shapes[3]};
+
+    do{
+        if(out_coords[1] == 0){ //For all kernels, the patches are the same. So start "gathering" when the "n_kernels" coord resets
+            size_t p_idx = 0;
+            //Gather algorithm
+            std::fill(patch_coords.begin(),patch_coords.end(),0);
+            do{
+                //out_coords layout = (Batch, N_kernels, Height, Width)
+                //patch_coords layout = (Batch, output_height, output_width)
+                size_t in_h = out_coords[2] * stride[0] - padding[0] + patch_coords[1];
+                size_t in_w = out_coords[3] * stride[1] - padding[1] + patch_coords[2];
+                
+                bool is_not_offset_region = in_h >= 0 && in_h < in_shape[2] && in_w >= 0 && in_w < in_shape[3];
+                patch[p_idx++] = is_not_offset_region ? in[
+                    _compute_idx_from_coords({out_coords[0],patch_coords[0],in_h,in_w}, in_shape._strides)
+                ] : 0.0f;
+            }while(_increment_odometer(patch_coords,patch_shapes));
+        }
+        //Compute dot product
+        std::fill(kernel_coords.begin()+1,kernel_coords.end(),0);
+        kernel_coords[0] = out_coords[1];
+        float acc = 0.0f;
+        for(size_t i = 0; i < patch_size; i++){
+            acc += patch[i] * ker[_compute_idx_from_coords(
+                kernel_coords, ker_shape._strides
+            )];
+            _increment_odometer(kernel_coords,ker_shape._shapes);
+        }
+        out[
+            _compute_idx_from_coords(out_coords,out_shape._strides)
+        ] = acc;
+
+    }while(_increment_odometer(out_coords,out_shape._shapes));
 }
 
 void CpuMath::conv3D(
@@ -206,23 +245,42 @@ void CpuMath::conv3D(
     float* out, Shape out_shape,
     std::array<size_t,3> stride, std::array<size_t,3> padding
 ) {
-
+    throw std::runtime_error("Error: not implemented");
 }
 
 void CpuMath::reLU(const float* a, float* out, size_t n_elements) {
-
+    for(size_t i = 0; i < n_elements; i++){
+        out[i] = std::max(a[i],0.0f);
+    }
 }
 
 void CpuMath::sigmoid(const float* a, float* out, size_t n_elements) {
-
+    for(size_t i = 0; i < n_elements; i++){
+        if(a[i] >= 0.0f){
+            out[i] = 1/(1+std::exp(-a[i]));
+        }else{
+            float temp = std::exp(a[i]);
+            out[i] = temp/(1+temp);
+        }
+    }
 }
 
 void CpuMath::tanh(const float* a, float* out, size_t n_elements) {
-
+    for(size_t i = 0; i < n_elements; i++){
+        out[i] = std::tanh(a[i]);
+    }
 }
 
+/*Assumes the input is a 1D tensor (a vector)*/
 void CpuMath::softmax(const float* a, float* out, size_t n_elements) {
-
+    float acc = 0.0f;
+    for(size_t i = 0; i < n_elements; i++){
+        acc += std::exp(a[i]);
+    }
+    if( std::abs(acc) < std::numeric_limits<float>::epsilon() ){ throw std::runtime_error("Error: Encountered division by zero"); }
+    for(size_t i = 0; i < n_elements; i++){
+        out[i] = std::exp(a[i]) / acc;
+    }
 }
 
 void CpuMath::sum(
@@ -230,5 +288,5 @@ void CpuMath::sum(
     float* out, Shape out_shape ,
     size_t axis
 ) {
-
+    
 }

@@ -1,7 +1,8 @@
 #include <core/Tensor.hpp>
 #include <stdexcept>
 #include <cstring>
-
+/*Creates a tensor of shape (m,n,l,..,z,y,x) where `m` is the outermost dimension and `x` the innermost dimension. 
+An optional value to fill the tensor can be specified, defaults to 0.0f */
 Tensor::Tensor(std::array<size_t,TENSOR_MAX_DIM> _shape, std::shared_ptr<Device> device, float _fill)
 : shape(_shape), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
     
