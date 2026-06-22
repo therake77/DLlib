@@ -233,6 +233,29 @@ void CpuMath::sum(
 
 }
 
+void CpuMath::_transpose2D(
+    const float* in, const Shape& in_shape,
+    float* out, const Shape& out_shape
+){
+    size_t rows = in_shape[0];
+    size_t cols = in_shape[1];
+
+    for(size_t i = 0; i < rows; ++i){
+        for(size_t j = 0; j < cols; ++j){
+
+            size_t src =
+                i * in_shape._strides[0] +
+                j * in_shape._strides[1];
+
+            size_t dst =
+                j * out_shape._strides[0] +
+                i * out_shape._strides[1];
+
+            out[dst] = in[src];
+        }
+    }
+}
+
 void CpuMath::transpose(
     const float* in, const Shape& in_shape,
     float* out, const Shape& out_shape
@@ -242,6 +265,10 @@ void CpuMath::transpose(
     }
     if(in_shape.n_dim < 2){
         std::memcpy(out, in, in_shape.n_elements * sizeof(float));
+        return;
+    }
+    if(in_shape.n_dim == 2){
+        _transpose2D(in, in_shape, out, out_shape);
         return;
     }
 

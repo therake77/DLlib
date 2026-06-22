@@ -40,4 +40,10 @@ public:
         const float* in, const Shape& in_shape,
         float* out, const Shape& out_shape
     ) override;
+
+private:
+    void _transpose2D(
+        const float* in, const Shape& in_shape,
+        float* out, const Shape& out_shape
+    );
 };
