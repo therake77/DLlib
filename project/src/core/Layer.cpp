@@ -1,10 +1,16 @@
 #include <core/Layer.hpp>
 #include <stdexcept>
+#include <cassert>
 
-Tensor Pooling::forward(Tensor input){
+
+Tensor Pooling2D::forward(Tensor& input){
+    
+    Tensor out {{4,5}};
+
     throw std::logic_error("Not implemented");
+
 }
 
-void Pooling::update_weights(Tensor input){
+void Pooling2D::update_weights(Tensor& input){
     throw std::logic_error("Not implemented");
 }

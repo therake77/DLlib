@@ -13,6 +13,12 @@ namespace{
         if(a_device_type != type || a_device_type != b_device_type){ throw std::runtime_error("Error: Unexpected device"); }
     }
 
+    void _ensure_same_device(Tensor& a, Tensor& b){
+        auto a_device_type = a.getDevice()->get_type();
+        auto b_device_type = b.getDevice()->get_type();
+        if(a_device_type != b_device_type){ throw std::runtime_error("Error: Unexpected device"); }
+    }
+
     /*Expands the shape adding outer dimensions of length one with strides of zeros */
     Shape _expand_shape_no_strides(const Shape& a){
         //Create the new shape consisting of all dimensions of length 1
@@ -167,7 +173,7 @@ void TensorMath::conv2D(Tensor& in, Tensor& ker, Tensor& out, size_t stride, siz
     //Ensure all tensors are EXACTLY 4D
     if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
     
-    //Should we implement all guards here?
+    //Should we implement all guards here? YES TODO(IMPLEMENT THE GUARDS)
 
     auto device = in.getDevice();
     
@@ -274,3 +280,18 @@ Tensor TensorMath::transpose(Tensor& a){
     }
     return out;
 }
+
+void max_pooling2d(
+    Tensor& in,  Tensor& out, std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes, 
+    std::array<std::size_t, 2> padding
+){
+    _ensure_same_device(in,out);
+
+}
+
+void avg_pooling2d(
+    Tensor& in, Tensor& out, std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes, 
+    std::array<std::size_t, 2> padding
+);

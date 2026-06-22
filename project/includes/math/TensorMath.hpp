@@ -22,4 +22,17 @@ namespace TensorMath {
     void sum(Tensor& a, size_t axis, Tensor& out);
     Tensor reshape(Tensor& a, std::array<size_t, TENSOR_MAX_DIM> new_shape);
     Tensor transpose(Tensor& a);
+
+    void max_pooling2d(
+        Tensor& in, Tensor& out, std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes, 
+        std::array<std::size_t, 2> padding
+    );
+
+    void avg_pooling2d(
+        Tensor& in, Tensor& out, std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes, 
+        std::array<std::size_t, 2> padding
+    );
+
 };
