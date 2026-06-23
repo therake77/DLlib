@@ -193,7 +193,7 @@ void CpuMath::conv2D(
         channel != ker_shape[1] ||
         n_kernels != out_shape[1]
     ){ 
-        std::runtime_error("Error: Shape inconsistency");
+        throw std::runtime_error("Error: Shape inconsistency");
     }
 
     /*This is stack memory. With the assumption of no big kernels, this is tolerable*/
