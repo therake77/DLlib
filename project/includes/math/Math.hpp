@@ -46,4 +46,8 @@ public:
         float* out, Shape out_shape ,
         size_t axis
     ) = 0;
+    virtual void transpose(
+        const float* in, const Shape& in_shape,
+        float* out, const Shape& out_shape
+    ) = 0;
 };
