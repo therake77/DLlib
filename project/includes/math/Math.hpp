@@ -68,4 +68,8 @@ public:
         std::array<std::size_t, 2> padding
     ) = 0;
     
+    virtual void transpose(
+        const float* in, const Shape& in_shape,
+        float* out, const Shape& out_shape
+    ) = 0;
 };

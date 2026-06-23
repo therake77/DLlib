@@ -57,4 +57,10 @@ public:
         const Shape out_shape,
         std::array<std::size_t, 2> padding
     ) override;
+
+    void transpose(
+        const float* in, const Shape& in_shape,
+        float* out, const Shape& out_shape
+    ) override;
+
 };

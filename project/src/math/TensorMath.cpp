@@ -230,54 +230,28 @@ Tensor TensorMath::reshape(Tensor& a, std::array<size_t, TENSOR_MAX_DIM> new_sha
     if(target_shape.n_elements != a.shape.n_elements){
         throw std::runtime_error("Error: reshape requires the same number of elements");
     }
-    Tensor out = Tensor(new_shape, a.getDevice());
+    Tensor out(new_shape, a.getDevice());
     for(size_t i = 0; i < a.shape.n_elements; i++){
         out.data()[i] = a.data()[i];
     }
     return out;
 }
 
-Tensor TensorMath::transpose(Tensor& a){    
-    if(a.shape.n_dim < 2){
-        return Tensor(a, a.getDevice());
+Tensor TensorMath::transpose(Tensor& a){
+    std::array<size_t, TENSOR_MAX_DIM> out_shape = a.shape._shapes;
+
+    if(a.shape.n_dim >= 2){
+        size_t last = a.shape.n_dim - 1;
+        size_t prev = a.shape.n_dim - 2;
+
+        size_t tmp = out_shape[prev];
+        out_shape[prev] = out_shape[last];
+        out_shape[last] = tmp;
     }
-    std::array<size_t, TENSOR_MAX_DIM> new_shape_arr = a.shape._shapes;
-    size_t last = a.shape.n_dim - 1;
-    size_t prev = a.shape.n_dim - 2;
-    size_t tmp = new_shape_arr[prev];
-    new_shape_arr[prev] = new_shape_arr[last];
-    new_shape_arr[last] = tmp;
-    Tensor out(new_shape_arr, a.getDevice());
-    std::array<size_t, TENSOR_MAX_DIM> coords;
-    coords.fill(0);
 
-    auto index_from_coords = [](const Shape& shape, const std::array<size_t, TENSOR_MAX_DIM>& c){
-        size_t idx = 0;
-        for(size_t i = 0; i < shape.n_dim; i++){
-            idx += c[i] * shape._strides[i];
-        }
-        return idx;
-    };
-
-    for(size_t processed = 0; processed < out.shape.n_elements; processed++){
-        std::array<size_t, TENSOR_MAX_DIM> src_coords = coords;
-        size_t tmp_coord = src_coords[prev];
-        src_coords[prev] = src_coords[last];
-        src_coords[last] = tmp_coord;
-
-        size_t src_idx = index_from_coords(a.shape, src_coords);
-        size_t dst_idx = index_from_coords(out.shape, coords);
-
-        out.data()[dst_idx] = a.data()[src_idx];
-
-        for(size_t i = out.shape.n_dim; i-- > 0;){
-            coords[i]++;
-            if(coords[i] < out.shape[i]){
-                break;
-            }
-            coords[i] = 0;
-        }
-    }
+    auto device = a.getDevice();
+    Tensor out(out_shape, device);
+    device->math->transpose(a.data(), a.shape, out.data(), out.shape);
     return out;
 }
 

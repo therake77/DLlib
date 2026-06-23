@@ -54,4 +54,11 @@ void GpuMath::avg_pooling2D(
     std::array<std::size_t, 2> padding
 ){ return; }
 
+void GpuMath::transpose(
+    const float* in, const Shape& in_shape,
+    float* out, const Shape& out_shape
+){
+    return;
+}
+
 #endif //__USE_CUDA__
