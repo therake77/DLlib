@@ -1,0 +1,117 @@
+#include <core/Tensor.hpp>
+#include <stdexcept>
+#include <cstring>
+/*Creates a tensor of shape (m,n,l,..,z,y,x) where `m` is the outermost dimension and `x` the innermost dimension. 
+An optional value to fill the tensor can be specified, defaults to 0.0f */
+Tensor::Tensor(
+    std::array<size_t,TENSOR_MAX_DIM> _shape, 
+    std::shared_ptr<Device> device, 
+    float _fill,
+    bool _fixed_value
+)
+: shape(_shape), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
+    
+    auto currDev = this->device.get();
+    void* data_ptr = currDev->allocate(shape.n_elements * sizeof(float));
+    if( data_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
+    
+    if(_fixed_value) currDev->memset(data_ptr,_fill,shape.n_elements);
+    else currDev->memset_rand(data_ptr,shape.n_elements);
+    
+    auto deleter =  [currDev](void* p){
+        currDev->free(p);
+    };
+
+    DeviceType type = this->device.get()->get_type();
+    if(type == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr,deleter);
+    }else{
+        this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr,deleter);
+    }
+
+}
+
+
+Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
+
+    void* data_ptr = this->device->allocate(shape.n_elements * sizeof(float));
+    if(data_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
+
+    auto src_type = t.getDevice().get()->get_type();
+    auto dst_type = this->device->get_type();
+
+    size_t _size = shape.n_elements;
+
+    if(src_type == DeviceType::CPU && dst_type == DeviceType::CPU){
+        std::memcpy(data_ptr, t.data(), _size * sizeof(float));
+    }else if(src_type == DeviceType::CPU && dst_type == DeviceType::GPU){
+        this->device->copy_to_device(data_ptr, t.data(), _size * sizeof(float));
+    }else if(src_type == DeviceType::GPU && dst_type == DeviceType::CPU){
+        this->device->copy_to_host(data_ptr, t.data(), _size * sizeof(float));
+    }else{
+        this->device->copy_device_to_device(data_ptr, t.data(), _size * sizeof(float));
+    }
+
+    auto curr_dev = this->device;
+    auto deleter = [curr_dev](void* ptr){
+        curr_dev->free(ptr);
+    };
+
+    if(this->device->get_type() == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->gpu_data.reset();
+    }else{
+        this->gpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->cpu_data.reset();
+    }
+}
+
+float* Tensor::data(){
+    if( this->device.get()->get_type() == DeviceType::CPU){
+        return static_cast<float*>(this->cpu_data.get());
+    }else{
+        return static_cast<float*>(this->gpu_data.get());
+    }
+}
+
+const float* Tensor::data() const{
+    if( this->device.get()->get_type() == DeviceType::CPU){
+        return static_cast<float*>(this->cpu_data.get());
+    }else{
+        return static_cast<float*>(this->gpu_data.get());
+    }
+}
+
+//TODO(Still tests are needed)
+void Tensor::to(std::shared_ptr<Device> device){
+    if(this->device->get_type() == device->get_type()) return;
+    
+    size_t _size = shape.n_elements;
+
+    void* data_ptr = device->allocate(_size * sizeof(float));
+    if(data_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
+    
+    auto curr_dev = device;
+    auto deleter = [curr_dev](void* ptr){
+        curr_dev->free(ptr);
+    };
+
+    if(device->get_type() == DeviceType::CPU){
+        //Data is in GPU, copy to CPU
+        device->copy_to_host(data_ptr, this->gpu_data.get(), _size * sizeof(float));
+        this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->gpu_data.reset();
+    }else{
+        //Data is in CPU, copy to GPU
+        device->copy_to_device(data_ptr, this->cpu_data.get(), _size * sizeof(float));
+        this->gpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
+        this->cpu_data.reset();
+    }
+    this->device = device;
+}

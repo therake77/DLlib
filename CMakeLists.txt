@@ -1,33 +1,64 @@
-cmake_minimum_required(VERSION 3.10.0)
-project(llcnn VERSION 0.1.0 LANGUAGES C CXX CUDA)
+cmake_minimum_required(VERSION 3.18)
+project(llcnn VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-set(CMAKE_CUDA_ARCHITECTURES native)
-find_package(CUDAToolkit REQUIRED)
+include(CheckLanguage)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    
+    set(CMAKE_CUDA_ARCHITECTURES native)
+    find_package(CUDAToolkit REQUIRED)
+    add_compile_definitions(__USE_CUDA__)
+
+else()
+    message(WARNING "CUDA compiler not found. GPU support will be disabled.")
+endif()
 
 
-include_directories(includes)
+include_directories(project/includes)
 
-
-add_library(cnn_lib STATIC
-    includes/cnn.hpp
-    src/cnn.cpp
-    includes/cnn/tensor.hpp
-    src/cnn/tensor.cpp
-    includes/cnn/backends/gpu_backend.cuh
-    src/cnn/backends/gpu_backend.cu
-    includes/cnn/backends/cpu_backend.hpp
-    src/cnn/backends/cpu_backend.cpp
-    includes/cnn/layers/base_layer.hpp
-    src/cnn/layers/base_layer.cpp
-    includes/cnn/layers/cnn_layer.hpp
-    src/cnn/layers/cnn_layer.cpp
-    includes/cnn/layers/pooling.hpp
-    src/cnn/layers/pooling.cpp
+set(SRC_FILES
+    project/src/core/ConvLayer.cpp
+    project/src/core/Pooling.cpp
+    project/src/core/Tensor.cpp
+    project/src/core/Shape.cpp
+    project/src/hardware/CpuDevice.cpp
+    project/src/hardware/DeviceManager.cpp
+    project/src/math/CpuMath.cpp
+    project/src/math/TensorMath.cpp
 )
 
-target_link_libraries(cnn_lib PRIVATE CUDA::cudart)
+if(CMAKE_CUDA_COMPILER)
+    list(APPEND SRC_FILES project/src/hardware/GpuDevice.cu)
+    list(APPEND SRC_FILES project/src/math/GpuMath.cu )
+endif()
+
+add_library(cnn_lib STATIC ${SRC_FILES})
+
+target_include_directories(cnn_lib PUBLIC include)
+
+add_executable(tensor_test tests/tensor_test.cpp)
+target_link_libraries(tensor_test PRIVATE cnn_lib)
+
+add_executable(conv_test tests/conv_test.cpp)
+target_link_libraries(conv_test PRIVATE cnn_lib)
+
+add_executable(conv_layer_test tests/conv_layer_test.cpp)
+target_link_libraries(conv_layer_test PRIVATE cnn_lib)
+
+add_executable(pooling_test tests/pooling_test.cpp)
+target_link_libraries(pooling_test PRIVATE cnn_lib)
+
+
+if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(pooling_test PRIVATE CUDA::cuda_driver)
+
+endif()
