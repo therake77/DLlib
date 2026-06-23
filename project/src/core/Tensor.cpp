@@ -1,8 +1,14 @@
 #include <core/Tensor.hpp>
 #include <stdexcept>
 #include <cstring>
-
-Tensor::Tensor(std::array<size_t,TENSOR_MAX_DIM> _shape, std::shared_ptr<Device> device, float _fill)
+/*Creates a tensor of shape (m,n,l,..,z,y,x) where `m` is the outermost dimension and `x` the innermost dimension. 
+An optional value to fill the tensor can be specified, defaults to 0.0f */
+Tensor::Tensor(
+    std::array<size_t,TENSOR_MAX_DIM> _shape, 
+    std::shared_ptr<Device> device, 
+    float _fill,
+    bool _fixed_value
+)
 : shape(_shape), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr){
     
     auto currDev = this->device.get();
@@ -11,7 +17,8 @@ Tensor::Tensor(std::array<size_t,TENSOR_MAX_DIM> _shape, std::shared_ptr<Device>
         throw std::runtime_error("Failed memory allocation");
     }
     
-    currDev->memset(data_ptr,_fill,shape.n_elements);
+    if(_fixed_value) currDev->memset(data_ptr,_fill,shape.n_elements);
+    else currDev->memset_rand(data_ptr,shape.n_elements);
     
     auto deleter =  [currDev](void* p){
         currDev->free(p);
@@ -25,6 +32,7 @@ Tensor::Tensor(std::array<size_t,TENSOR_MAX_DIM> _shape, std::shared_ptr<Device>
     }
 
 }
+
 
 Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
 

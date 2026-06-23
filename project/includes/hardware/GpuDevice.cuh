@@ -17,6 +17,7 @@ public:
     void copy_device_to_device(void* dst, const void* src, size_t size) override;
 
     void memset(void* dst, float value, size_t size) override;
+    void memset_rand(void*dst, size_t size) override;
 
     DeviceType get_type() const override;
     std::string get_name() const override;

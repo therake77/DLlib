@@ -52,6 +52,8 @@ void matmul_test(std::shared_ptr<Device> device){
     Tensor b = Tensor({1,3}, device, 2.0f);
     Tensor c = Tensor({2,1,3}, device);
     try{
+        fancy_print(a);
+        fancy_print(b);
         TensorMath::matmul(a,b,c);
     }catch(std::exception){
         std::cout<<"matmul_test: Test failed";

@@ -20,23 +20,23 @@ else()
 endif()
 
 
-include_directories(includes)
+include_directories(project/includes)
 
 set(SRC_FILES
-    src/core/Layer.cpp
-    src/core/ConvLayer.cpp
-    src/core/Pooling.cpp
-    src/core/Tensor.cpp
-    src/core/Shape.cpp
-    src/hardware/CpuDevice.cpp
-    src/hardware/DeviceManager.cpp
-    src/math/CpuMath.cpp
-    src/math/TensorMath.cpp
+    project/src/core/Layer.cpp
+    project/src/core/ConvLayer.cpp
+    project/src/core/Pooling.cpp
+    project/src/core/Tensor.cpp
+    project/src/core/Shape.cpp
+    project/src/hardware/CpuDevice.cpp
+    project/src/hardware/DeviceManager.cpp
+    project/src/math/CpuMath.cpp
+    project/src/math/TensorMath.cpp
 )
 
 if(CMAKE_CUDA_COMPILER)
-    list(APPEND SRC_FILES src/hardware/GpuDevice.cu)
-    list(APPEND SRC_FILES src/math/GpuMath.cu )
+    list(APPEND SRC_FILES project/src/hardware/GpuDevice.cu)
+    list(APPEND SRC_FILES project/src/math/GpuMath.cu )
 endif()
 
 add_library(cnn_lib STATIC ${SRC_FILES})
@@ -45,4 +45,16 @@ target_include_directories(cnn_lib PUBLIC include)
 
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
-target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
+
+add_executable(conv_test tests/conv_test.cpp)
+target_link_libraries(conv_test PRIVATE cnn_lib)
+
+add_executable(conv_layer_test tests/conv_layer_test.cpp)
+target_link_libraries(conv_layer_test PRIVATE cnn_lib)
+
+
+if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
+endif()
