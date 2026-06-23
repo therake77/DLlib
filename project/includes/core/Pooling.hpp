@@ -1,16 +1,37 @@
 #include <core/Layer.hpp>
 
-
-class MaxPooling : public Pooling{
+class MaxPooling : virtual public Layer{
+private:
+    std::array<std::size_t, 2> window_shape;
+    std::array<std::size_t, 2> stride;
+    std::array<std::size_t, 2> padding;
 public:
     ~MaxPooling() override = default;
-    float pool_patch() override;
-    void backprop_patch() override;
+
+    MaxPooling(
+        std::array<std::size_t, 2> _window_shape,
+        std::array<std::size_t, 2> _stride,
+        std::array<std::size_t, 2> _padding
+    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+
+    Tensor forward(Tensor&) override;
+    void update_weights(Tensor&) override;
 };  
 
-class AvgPooling : public Pooling{
+class AvgPooling : public Layer{
+private:
+    std::array<std::size_t, 2> window_shape;
+    std::array<std::size_t, 2> stride;
+    std::array<std::size_t, 2> padding;
 public:
     ~AvgPooling() override = default;
-    float pool_patch() override;    
-    void backprop_patch() override;
+
+    AvgPooling(
+        std::array<std::size_t, 2> _window_shape,
+        std::array<std::size_t, 2> _stride,
+        std::array<std::size_t, 2> _padding
+    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+
+    Tensor forward(Tensor&) override;
+    void update_weights(Tensor&) override;
 };

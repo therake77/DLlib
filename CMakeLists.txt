@@ -23,7 +23,6 @@ endif()
 include_directories(project/includes)
 
 set(SRC_FILES
-    project/src/core/Layer.cpp
     project/src/core/ConvLayer.cpp
     project/src/core/Pooling.cpp
     project/src/core/Tensor.cpp
@@ -52,9 +51,14 @@ target_link_libraries(conv_test PRIVATE cnn_lib)
 add_executable(conv_layer_test tests/conv_layer_test.cpp)
 target_link_libraries(conv_layer_test PRIVATE cnn_lib)
 
+add_executable(pooling_test tests/pooling_test.cpp)
+target_link_libraries(pooling_test PRIVATE cnn_lib)
+
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(pooling_test PRIVATE CUDA::cuda_driver)
+
 endif()
