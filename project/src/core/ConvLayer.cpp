@@ -10,7 +10,15 @@ Conv2D::Conv2D(
     this->device = dev;
 }
 
-Tensor Conv2D::forward(Tensor input){
+
+/*
+@brief Computes the forward pass of a convolution layer
+@param[in] input Input tensor - coming from upper layers
+@param[out] output Preallocated output tensor
+@result A new, freshly allocated tensor if no output was given, else `void`
+@note It is absolutely not recommended to pass the input tensor as the output tensor, as the method will overwrite data during the operation
+*/
+Tensor Conv2D::forward(Tensor& input){
     size_t batch_dim = input.shape[0];
     size_t c_out = this->kernels.shape[0];
     
@@ -18,7 +26,7 @@ Tensor Conv2D::forward(Tensor input){
     
     size_t out_h = ((input.shape[2] - kernels.shape[2] + 2 * padding[0]) / strides[0]) + 1;
     size_t out_w = ((input.shape[3] - kernels.shape[3] + 2 * padding[1]) / strides[1]) + 1;
-    std::array<size_t, TENSOR_MAX_DIM> out_shape = {
+    std::array<size_t, TENSOR_MAX_DIM> out_shape {
         batch_dim,
         c_out,
         out_h,
@@ -38,6 +46,6 @@ Tensor Conv2D::forward(Tensor input){
     return _out;
 }
 
-void Conv2D::update_weights(Tensor input){
+void Conv2D::update_weights(Tensor& input){
     TensorMath::add(kernels,input,kernels);
 }

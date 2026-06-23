@@ -46,6 +46,28 @@ public:
         float* out, Shape out_shape ,
         size_t axis
     ) = 0;
+
+    //Pooling operations
+    virtual void max_pooling2D(
+        const float* input,
+        const Shape input_shape,
+        std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes,    //(Height , Width)
+        float* out,
+        const Shape out_shape,
+        std::array<std::size_t, 2> padding
+    ) = 0;
+
+    virtual void avg_pooling2D(
+        const float* input,
+        const Shape input_shape,
+        std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes,    //(Height , Width)
+        float* out,
+        const Shape out_shape,
+        std::array<std::size_t, 2> padding
+    ) = 0;
+    
     virtual void transpose(
         const float* in, const Shape& in_shape,
         float* out, const Shape& out_shape

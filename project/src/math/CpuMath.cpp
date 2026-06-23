@@ -288,7 +288,95 @@ void CpuMath::sum(
     float* out, Shape out_shape ,
     size_t axis
 ) {
+    throw std::runtime_error("Error: not implemented");
+}
+
+void CpuMath::max_pooling2D(
+    const float* input,
+    const Shape input_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Both input and output should be 4 dimensional
+    assert(input_shape.n_dim == 4 && out_shape.n_dim == 4);
     
+    //Odometer holders
+    std::vector<std::size_t> in_coords(input_shape.n_dim,0);
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    std::vector<std::size_t> patch_coords(2,0);
+    std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
+
+    do{
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        float max_value = std::numeric_limits<float>::lowest();
+        do{
+            //Compute the coordinates of the input tensor
+            std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            
+            //If the computed coordinates are not in the padding region, compare the actual value
+            if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
+                float value = input[ _compute_idx_from_coords(
+                    {out_coords[0],out_coords[1], in_h, in_w},
+                    input_shape._strides
+                )];
+                if( max_value < value ) max_value = value;
+            }else{
+                //The padding region. Value is zero
+                if( max_value < 0 ) max_value = 0;
+            }
+        }while(_increment_odometer(patch_coords,patch_shapes));
+        out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = max_value;
+    }while(_increment_odometer(out_coords,out_shape._shapes));
+
+    return;
+}
+
+void CpuMath::avg_pooling2D(
+    const float* input,
+    const Shape input_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Both input and output should be 4 dimensional
+    assert(input_shape.n_dim == 4 && out_shape.n_dim == 4);
+    
+    //Odometer holders
+    std::vector<std::size_t> in_coords(input_shape.n_dim,0);
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    std::vector<std::size_t> patch_coords(2,0);
+    std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
+
+    std::size_t window_n_elements = window_shapes[0] * window_shapes[1];
+
+    do{
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        float sum {0.0f};
+        do{
+            //Compute the coordinates of the input tensor
+            std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            
+            //If the computed coordinates are not in the padding region, compare the actual value
+            if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
+                float value = input[ _compute_idx_from_coords(
+                    {out_coords[0],out_coords[1], in_h, in_w},
+                    input_shape._strides
+                )];
+                sum+=value;
+            }
+            //If is in the padding region, do nothing (sum + 0 = sum)
+        }while(_increment_odometer(patch_coords,patch_shapes));
+        out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = sum/window_n_elements;
+    }while(_increment_odometer(out_coords,out_shape._shapes));
+
+    return;
 }
 
 void CpuMath::_transpose2D(
