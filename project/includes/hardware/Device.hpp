@@ -15,6 +15,7 @@ enum class DeviceType {
 class Device {
 public:
     std::unique_ptr<Math> math;
+
     virtual ~Device() = default;
     Device() = default;
 

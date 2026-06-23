@@ -115,3 +115,39 @@ void Tensor::to(std::shared_ptr<Device> device){
     }
     this->device = device;
 }
+
+//TODO(Check correct management of memory)
+void Tensor::resize(Shape s){
+    //Checking if the number of elements remains the same (just a reshape)
+    if(s.n_elements == this->shape.n_elements){
+        this->shape = s;
+    }
+
+    //Not a simple reshape: Allocate fresh memory and copy the current data to the new pointer
+    void* new_ptr = this->device->allocate(s.n_elements * sizeof(float));
+
+    auto currDev = this->device;
+    auto deleter =  [currDev](void* p){
+        currDev->free(p);
+    };
+
+    this->device->copy_device_to_device(new_ptr,this->data(),this->shape.n_elements);
+
+    //Drop the old data, assign new unique_ptr to the corresponding data
+    switch(device->get_type()){
+        case(DeviceType::CPU) : {
+            this->cpu_data.reset();
+            this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
+                new_ptr,
+                deleter
+            );
+        }
+        case(DeviceType::GPU) : {
+            this->gpu_data.reset();
+            this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
+                new_ptr,
+                deleter
+            );
+        }
+    }
+}

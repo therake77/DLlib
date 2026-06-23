@@ -27,7 +27,7 @@
         const float* data() const;
         void to(std::shared_ptr<Device>);
         const inline std::shared_ptr<Device>& getDevice() const { return this->device; }
-
+        void resize(Shape s);
     };
 
 #endif
