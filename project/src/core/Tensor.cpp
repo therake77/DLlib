@@ -151,3 +151,8 @@ void Tensor::resize(Shape s){
         }
     }
 }
+
+Tensor& Tensor::unsqueeze(std::size_t axis){
+    this->shape = this->shape.unsqueeze(axis);
+    return;
+}

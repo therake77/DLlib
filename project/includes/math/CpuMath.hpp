@@ -6,10 +6,14 @@ public:
     ~CpuMath() override = default;
     CpuMath() = default;
 
-    void add(const float* a, const float* b, float* out, size_t size) override;
-    void sub(const float* a, const float* b, float* out, size_t size) override;
-    void scale(const float* a, float* out, float _n, size_t size) override;
-    void multiply(const float* a, const float* b, float* out, size_t size) override;
+    void add(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) override;
+    void sub(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) override;
+    void scale(const float* a, float* out, float _n, Shape shape) override;
+    void multiply(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) override;
+    void divide(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) override;
+    void sqrt(const float* a,  Shape a_shape, float* out, Shape out_shape) override;
+    void pow(const float* a,  Shape a_shape, int _n, float* out, Shape out_shape) override;
+    
     void matmul(
         const float* a , Shape a_shape,  
         const float* b , Shape b_shape,

@@ -9,7 +9,6 @@ enum class ActivationTypes{
 class ActivationLayer : public Layer{
 private:
     ActivationTypes type;
-    Tensor _out;
 public:
 
     ActivationLayer(

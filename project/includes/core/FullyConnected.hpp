@@ -5,7 +5,7 @@ private:
     Tensor _weights;
     Tensor _bias;
     Tensor _grad;
-    Tensor _out;
+
 public:
     Tensor& weigths = _weights;
     Tensor& grad = _grad;

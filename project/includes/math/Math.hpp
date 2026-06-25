@@ -1,15 +1,20 @@
 #pragma once
 #include <core/Shape.hpp>
+#include <functional>
 
 class Math{
 public:
     virtual ~Math() = default;
     Math() = default;
 
-    virtual void add(const float* a, const float* b, float* out, size_t size) = 0;
-    virtual void sub(const float* a, const float* b, float* out, size_t size) = 0;
-    virtual void scale(const float* a, float* out, float _n, size_t size) = 0;
-    virtual void multiply(const float* a, const float* b, float* out, size_t size) = 0;
+    virtual void add(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) = 0;
+    virtual void sub(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) = 0;
+    virtual void scale(const float* a, float* out, float _n, Shape shape) = 0;
+    virtual void multiply(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) = 0;
+    virtual void divide(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape) = 0;
+    virtual void sqrt(const float* a,  Shape a_shape, float* out, Shape out_shape) = 0;
+    virtual void pow(const float* a,  Shape a_shape, int _n, float* out, Shape out_shape) = 0;
+
 
     //Linear Algebra
     virtual void matmul(

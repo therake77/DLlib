@@ -28,6 +28,9 @@
         void to(std::shared_ptr<Device>);
         const inline std::shared_ptr<Device>& getDevice() const { return this->device; }
         void resize(Shape s);
+
+        Tensor& unsqueeze(std::size_t axis);
+
     };
 
 #endif

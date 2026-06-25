@@ -5,7 +5,7 @@ private:
     std::shared_ptr<Device> device;
     Tensor _kernels;
     Tensor _grad;
-    Tensor _out;
+    
     std::array<size_t,2> padding;
     std::array<size_t,2> strides;
 public:

@@ -68,30 +68,124 @@ namespace{
 
 };
 
+/*
+    @brief Adds two tensors
+    @param a First operand
+    @param a_shape Shape of first operand
+    @param b Second operand
+    @param b_shape Shape of second operand
+    @param out Output tensor
+    @param out_shape Shape of output tensor
+    @note The method is specially designed to support broadcasted tensors
+*/
+void CpuMath::add(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
 
-void CpuMath::add(const float* a, const float* b, float* out, size_t size){
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] + b[i];
-    }
+        out[out_idx] = a[a_idx] + b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
-void CpuMath::sub(const float* a, const float* b, float* out, size_t size) {
+/*
+    @brief Subtracts two tensors
+    @param a Pointer to first tensor operand data
+    @param a_shape Shape of first operand
+    @param b Pointer to second tensor operand data
+    @param b_shape Shape of second operand
+    @param out Pointer to output tensor data
+    @param out_shape Shape of output tensor
+    @note The method is specially designed to support broadcasted tensors
+*/
+void CpuMath::sub(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+) {
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
 
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] - b[i];
-    }
+        out[out_idx] = a[a_idx] - b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
-void CpuMath::scale(const float* a, float* out, float _n, size_t size) {
-    for(size_t i = 0; i < size; i++){
+void CpuMath::scale(const float* a, float* out, float _n, Shape shape) {
+    for(size_t i = 0; i < shape.n_elements; i++){
         out[i] = _n*a[i];
     }
 }
 
-void CpuMath::multiply(const float* a, const float* b, float* out, size_t size) {
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] * b[i];
-    }
+void CpuMath::divide(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = a[a_idx] / b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
+}
+
+void CpuMath::sqrt(const float* a,  Shape a_shape, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = std::sqrt(a[a_idx]); 
+    }while(_increment_odometer(coords,shapes));
+}
+
+void CpuMath::pow(const float* a,  Shape a_shape, int _n, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = std::pow(a[a_idx],_n); 
+    }while(_increment_odometer(coords,shapes));
+}
+
+void CpuMath::multiply(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+) {
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = a[a_idx] * b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
 /* Contracts two tensors on the two innermost dimensions

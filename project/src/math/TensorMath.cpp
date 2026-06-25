@@ -7,6 +7,11 @@ namespace{
         if(a.shape != b.shape){ throw std::runtime_error("Error: Tensor shape mismatch"); }
     }
 
+    /*Ensures `a` and `b` have the same exact shape*/
+    void _ensure_same_shape(Shape& a, Shape& b){
+        if(a != b){ throw std::runtime_error("Error: Tensor shape mismatch"); }
+    }
+
     void _ensure_same_device(Tensor& a, Tensor& b, DeviceType type){
         auto a_device_type = a.getDevice()->get_type();
         auto b_device_type = b.getDevice()->get_type();
@@ -57,6 +62,7 @@ namespace{
         for(size_t i = TENSOR_MAX_DIM - 2; i-->0;){
             //If one of them is one, then broadcast the max shape between both
             if(a._shapes[i] == 1 || b._shapes[i] == 1){
+                if(a._shapes[i] == b._shapes[i]){ continue; } //Both are 1, respect stride
                 size_t max = std::max(a._shapes[i], b._shapes[i]);
                 //Before broadcasting, we need sure to put a zero stride on the dimension affected
                 if( a._shapes[i] == max) b._strides[i] = 0; 
@@ -94,28 +100,68 @@ namespace{
 };
 /*Function that adds two tensors component-wise. It is safe to put the input argument `a` as `out`*/
 void TensorMath::add(Tensor& a, Tensor&b, Tensor& out){
-    _ensure_same_shape(a,b);
-    _ensure_same_device(a,b,DeviceType::CPU);
-    _ensure_same_shape(b,out);
-    _ensure_same_device(b,out,DeviceType::CPU);
+    _ensure_same_device(a,b);
+    _ensure_same_device(b,out);
     
+    //Copy the shapes
+    Shape a_shape = a.shape;
+    Shape b_shape = b.shape;
+
+    //Perform broadcasting
+    Shape::broadcast_shapes(a_shape,b_shape);
+
+    //Shape guards
+    _ensure_same_shape(a_shape,b_shape);
+    _ensure_same_shape(b_shape,out.shape);
+
     auto device = a.getDevice();
-    device->math->add(a.data(),b.data(),out.data(),a.shape.n_elements);
+    device->math->add(
+        a.data(),
+        a_shape,
+        b.data(),
+        b_shape,
+        out.data(),
+        out.shape);
 
 }
 
 void TensorMath::sub(Tensor& a, Tensor&b, Tensor& out){
-    _ensure_same_shape(a,b);
-    _ensure_same_device(a,b,DeviceType::CPU);
-    _ensure_same_shape(b,out);
-    _ensure_same_device(b,out,DeviceType::CPU);
+    _ensure_same_device(a,b);
+    _ensure_same_device(b,out);
+    
+    //Copy the shapes
+    Shape a_shape = a.shape;
+    Shape b_shape = b.shape;
 
+    //Perform broadcasting
+    Shape::broadcast_shapes(a_shape,b_shape);
+
+    //Shape guards
+    _ensure_same_shape(a_shape,b_shape);
+    _ensure_same_shape(b_shape,out.shape);
+
+    auto device = a.getDevice();
+    device->math->sub(
+        a.data(),
+        a_shape,
+        b.data(),
+        b_shape,
+        out.data(),
+        out.shape
+    );
 }
 
 void TensorMath::scale(Tensor& a, float n, Tensor& out){
     _ensure_same_shape(a,out);
     _ensure_same_device(a,out,DeviceType::CPU);
 
+    auto device = a.getDevice();
+    device->math->scale(
+        a.data(),
+        out.data(),
+        n,
+        a.shape
+    );
 }
 
 void TensorMath::multiply(Tensor& a, Tensor& b, Tensor& out){
@@ -124,6 +170,78 @@ void TensorMath::multiply(Tensor& a, Tensor& b, Tensor& out){
     _ensure_same_shape(b,out);
     _ensure_same_device(b,out,DeviceType::CPU);
 
+    //Copy the shapes
+    Shape a_shape = a.shape;
+    Shape b_shape = b.shape;
+
+    //Perform broadcasting
+    Shape::broadcast_shapes(a_shape,b_shape);
+
+    auto device = a.getDevice();
+    device->math->multiply(
+        a.data(),
+        a_shape,
+        b.data(),
+        b_shape,
+        out.data(),
+        out.shape
+    );
+
+}
+
+void TensorMath::divide(Tensor& a, Tensor& b, Tensor& out){
+    _ensure_same_device(a,b);
+    _ensure_same_device(b,out);
+    
+    //Copy the shapes
+    Shape a_shape = a.shape;
+    Shape b_shape = b.shape;
+
+    //Perform broadcasting
+    Shape::broadcast_shapes(a_shape,b_shape);
+
+    //Shape guards
+    _ensure_same_shape(a_shape,b_shape);
+    _ensure_same_shape(b_shape,out.shape);
+
+
+    auto device = a.getDevice();
+    device->math->multiply(
+        a.data(),
+        a_shape,
+        b.data(),
+        b_shape,
+        out.data(),
+        out.shape
+    );
+
+}
+
+void TensorMath::sqrt(Tensor& a, Tensor& out){
+    _ensure_same_shape(a,out);
+    _ensure_same_device(a,out);
+
+    auto device = a.getDevice();
+    device->math->sqrt(
+        a.data(),
+        a.shape,
+        out.data(),
+        out.shape
+    );
+}
+
+void TensorMath::pow(Tensor& a, int i, Tensor& out){
+    _ensure_same_shape(a,out);
+    _ensure_same_device(a,out);
+
+    auto device = a.getDevice();
+    device->math->pow(
+        a.data(),
+        a.shape,
+        i,
+        out.data(),
+        out.shape
+    );
 }
 
 /*Matmul routine*/
@@ -141,19 +259,6 @@ void TensorMath::matmul(Tensor& a , Tensor& b , Tensor& out){
     Shape _virtual_expanded_out = _expand_shape_with_strides(out.shape);
     _check_matmul_shapes(_expanded_a,_expanded_b,_virtual_expanded_out);
 
-    //Now call the real matmul
-
-    std::printf("--- MATMUL METADATA SANITY CHECK ---\n");
-    std::printf("A Shape:   [%zu, %zu, %zu, %zu] | Strides: [%zu, %zu, %zu, %zu]\n",
-            _expanded_a[0], _expanded_a[1], _expanded_a[2], _expanded_a[3],
-            _expanded_a._strides[0], _expanded_a._strides[1], _expanded_a._strides[2], _expanded_a._strides[3]);
-    std::printf("B Shape:   [%zu, %zu, %zu, %zu] | Strides: [%zu, %zu, %zu, %zu]\n",
-            _expanded_b[0], _expanded_b[1], _expanded_b[2], _expanded_b[3],
-            _expanded_b._strides[0], _expanded_b._strides[1], _expanded_b._strides[2], _expanded_b._strides[3]);
-    std::printf("Out Shape: [%zu, %zu, %zu, %zu] | Strides: [%zu, %zu, %zu, %zu]\n",
-            _virtual_expanded_out[0], _virtual_expanded_out[1], _virtual_expanded_out[2], _virtual_expanded_out[3],
-            _virtual_expanded_out._strides[0], _virtual_expanded_out._strides[1], _virtual_expanded_out._strides[2], _virtual_expanded_out._strides[3]);
-
     device->math->matmul(
         a.data(),_expanded_a,
         b.data(),_expanded_b,
@@ -162,6 +267,7 @@ void TensorMath::matmul(Tensor& a , Tensor& b , Tensor& out){
 
     //Finish
 }
+
 /*
 Convolution operation.
 Expects 4D tensors. No exceptions allowed.
@@ -215,7 +321,9 @@ void TensorMath::conv3D(Tensor& in, Tensor& ker, Tensor& out, std::array<size_t,
 
 }
 
-void TensorMath::reLU(Tensor& a, Tensor& out){}
+void TensorMath::reLU(Tensor& a, Tensor& out){
+    _ensure_same_shape(a,out);
+}
 
 void TensorMath::sigmoid(Tensor& a, Tensor& out){}
 
@@ -223,7 +331,7 @@ void TensorMath::tanh(Tensor& a, Tensor& out){}
 
 void TensorMath::softmax(Tensor& a, Tensor& out){}
 
-void TensorMath::sum(Tensor& a, size_t axis, Tensor& out){}
+void TensorMath::sum(Tensor& a, std::size_t axis, Tensor& out){}
 
 Tensor TensorMath::reshape(Tensor& a, std::array<size_t, TENSOR_MAX_DIM> new_shape){
     Shape target_shape(new_shape);

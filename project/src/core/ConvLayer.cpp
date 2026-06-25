@@ -10,7 +10,7 @@ Conv2D::Conv2D(
     _grad(kernel_shape,dev), 
     padding(_padding),
     strides(_strides),
-    _out({1,1,1,1},dev,0.0f,true)
+    Layer({1,1,1,1},dev)
 {
     this->device = dev;
 }
@@ -57,5 +57,6 @@ Tensor& Conv2D::forward(Tensor& input){
 }
 
 void Conv2D::update_weights(Tensor& input){
+    
     TensorMath::add(kernels,input,kernels);
 }

@@ -12,9 +12,9 @@ public:
         std::array<std::size_t, 2> _window_shape,
         std::array<std::size_t, 2> _stride,
         std::array<std::size_t, 2> _padding
-    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+    );
 
-    Tensor forward(Tensor&) override;
+    Tensor& forward(Tensor&) override;
     void update_weights(Tensor&) override;
 };  
 
@@ -30,8 +30,8 @@ public:
         std::array<std::size_t, 2> _window_shape,
         std::array<std::size_t, 2> _stride,
         std::array<std::size_t, 2> _padding
-    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+    );
 
-    Tensor forward(Tensor&) override;
+    Tensor& forward(Tensor&) override;
     void update_weights(Tensor&) override;
 };

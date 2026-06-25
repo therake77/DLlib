@@ -7,7 +7,7 @@ ActivationLayer::ActivationLayer(
     std::array<std::size_t, TENSOR_MAX_DIM> _input_shape,
     ActivationTypes _type,
     std::shared_ptr<Device> dev 
-) : _out(_input_shape,dev,0.0f,true), type(_type) {}
+) : Layer(_input_shape,dev), type(_type) {}
 
 Tensor& ActivationLayer::forward(Tensor& input){
     if(input.shape != this->_out.shape){

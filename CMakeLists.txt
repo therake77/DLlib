@@ -26,9 +26,11 @@ set(SRC_FILES
     project/src/core/ConvLayer.cpp
     project/src/core/FullyConnected.cpp
     project/src/core/ActivationLayer.cpp
+    project/src/core/BatchNormLayer.cpp
     project/src/core/Pooling.cpp
     project/src/core/Tensor.cpp
     project/src/core/Shape.cpp
+    project/src/core/ConvNeuralNetwork.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
