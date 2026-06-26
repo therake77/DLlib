@@ -76,11 +76,69 @@ Shape Shape::unsqueeze(std::size_t axis){
     return Shape(new_shape);
 }
 
+void Shape::transpose(){
+    if(this->n_dim <= 1) { return; }
+    std::size_t index1 = this->n_dim-1;
+    std::size_t index2 = this->n_dim-2;
+    std::swap(this->_shapes[index1],this->_shapes[index2]);
+    std::swap(this->_strides[index1],this->_strides[index2]);
+}
 
+void Shape::transpose(std::size_t index1,std::size_t index2){
+    if(index1 < this->n_dim && index2 < this->n_dim ){ 
+        if(index1 == index2) { return; }
+        std::swap(this->_shapes[index1],this->_shapes[index2]);
+        std::swap(this->_strides[index1],this->_strides[index2]);
+        
+    }else{
+        throw std::runtime_error("Error: index out of bounds");
+    }
+    return;
+}
+
+/*
+    @brief Expands (or contracts) the shape, adding scalar dimensions (or removing dimensions) on the right side (innermost side)
+*/
+void Shape::inner_pad(std::size_t dim){
+    if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
+    if( dim == n_dim){ return; }
+    std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
+    std::size_t i = 0;  
+    std::size_t j = 0;
+    while( i < dim && j < this->n_dim){
+        new_shapes[i++] = this->_shapes[j++];
+    }
+    while(i < dim ){
+        new_shapes[j++] = 1;
+    }
+    _trigger_shape_recomposition();
+}
+
+/*
+    @brief Expands (or contracts) the shape, adding scalar dimensions (or removing dimensions) on the left side (outermost side)
+*/
+void Shape::outer_pad(std::size_t dim){
+    if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
+    if( dim == n_dim){ return; }
+    std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
+    std::size_t i = dim;  
+    std::size_t j = this->n_dim;
+    while( i --> 0 && j --> 0){
+        new_shapes[i] = this->_shapes[j];
+    }
+    while(i --> 0 ){
+        new_shapes[i] = 1;
+    }
+    _trigger_shape_recomposition();
+}
+
+/*
+    @brief Broadcast two shapes. If their dimensionality don't match, expands them outerly
+*/
 void Shape::broadcast_shapes(Shape& a, Shape& b){
-    if( a.n_dim != b.n_dim){ throw std::runtime_error("Error: Bad broadcast"); }
-
-    auto n_dim = a.n_dim;
+    auto n_dim = std::max(a.n_dim,b.n_dim);
+    a.outer_pad(n_dim);
+    b.outer_pad(n_dim);
 
     for(size_t  i = n_dim; i --> 0;){
         if( a[i] == 1 || b[i] == 1 ){

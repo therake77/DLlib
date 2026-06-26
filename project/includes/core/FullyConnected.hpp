@@ -2,21 +2,21 @@
 
 class FullyConnected : public Layer{
 private:
+    std::size_t input_dim;
+    std::size_t output_dim;
     Tensor _weights;
     Tensor _bias;
-    Tensor _grad;
+    std::unique_ptr<Tensor> _bias_grad;
 
 public:
-    Tensor& weigths = _weights;
-    Tensor& grad = _grad;
 
     FullyConnected(
         std::array<size_t, TENSOR_MAX_DIM> weight_shape,
         std::shared_ptr<Device> dev
     );
 
-    Tensor& forward(Tensor&) override;
-    void update_weights(Tensor&) override;
+    std::shared_ptr<Tensor> forward( const Tensor& ) override;
+    std::shared_ptr<Tensor> backward( const Tensor&, const Tensor&  ) override;
+    void update_weight() override;
 
-    void update_bias(Tensor&);
 };

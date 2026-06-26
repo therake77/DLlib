@@ -12,12 +12,12 @@ private:
 public:
 
     ActivationLayer(
-        std::array<std::size_t, TENSOR_MAX_DIM>,
         ActivationTypes = ActivationTypes::ReLU,
         std::shared_ptr<Device> = DeviceManager::get_cpu_device()
     );
 
-    Tensor& forward(Tensor&) override;
-    void update_weights(Tensor&) override;
+    std::shared_ptr<Tensor> forward( const Tensor& ) override;
+    std::shared_ptr<Tensor> backward( const Tensor&, const Tensor&  ) override;
+    void update_weight() override;
 
 };

@@ -10,7 +10,7 @@ public:
         std::vector<Layer> layers
     );
 
-    Tensor& forward(Tensor& input);
-    Tensor& backwards(Tensor& input);
+    std::shared_ptr<Tensor> forward( const Tensor& );
+    std::shared_ptr<Tensor> backward( const Tensor& );
 
 };

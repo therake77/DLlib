@@ -30,13 +30,6 @@ public:
         std::array<size_t,2> stride, std::array<size_t,2> padding
     ) = 0;
 
-    virtual void conv3D(
-        const float* in, Shape in_shape,
-        const float* ker, Shape ker_shape,
-        float* out, Shape out_shape,
-        std::array<size_t,3> stride, std::array<size_t,3> padding
-    ) = 0;
-
     //Activation functions
     virtual void reLU(
         const float* a, float* out, size_t n_elements
@@ -58,6 +51,20 @@ public:
         const Shape input_shape,
         std::array<std::size_t,2> strides,  
         std::array<std::size_t,2> window_shapes,    //(Height , Width)
+        float* mask,
+        const Shape mask_shape,
+        float* out,
+        const Shape out_shape,
+        std::array<std::size_t, 2> padding
+    ) = 0;
+
+    virtual void inv_max_pooling2D(
+        const float* input,
+        const Shape input_shape,
+        std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes,    //(Height , Width)
+        const float* mask,
+        const Shape mask_shape,
         float* out,
         const Shape out_shape,
         std::array<std::size_t, 2> padding
@@ -72,7 +79,50 @@ public:
         const Shape out_shape,
         std::array<std::size_t, 2> padding
     ) = 0;
+
+    virtual void inv_avg_pooling2D(
+        const float* input,
+        const Shape input_shape,
+        std::array<std::size_t,2> strides,  
+        std::array<std::size_t,2> window_shapes,    //(Height , Width)
+        float* out,
+        const Shape out_shape,
+        std::array<std::size_t, 2> padding
+    ) = 0;
     
+    virtual void binary_positive_mask(
+        const float* in,
+        const Shape& in_shape,
+        float* out,
+        const Shape& out_shape
+    ) = 0;
+
+    virtual void mean(
+        const float* in,
+        const Shape& in_shape,
+        float* out,
+        const Shape& out_shape,
+        std::size_t axis
+    ) = 0;
+
+    virtual void variance(
+        const float* in,
+        const Shape& in_shape,
+        const float* mean,
+        const Shape& mean_shape,
+        float* out,
+        const Shape& out_shape,
+        std::size_t axis
+    ) = 0;
+
+    virtual void reduce_all(
+        const float* in,
+        const Shape& in_shape,
+        float* out,
+        const Shape& out_shape,
+        std::size_t axis
+    ) = 0;
+
     virtual void transpose(
         const float* in, const Shape& in_shape,
         float* out, const Shape& out_shape

@@ -39,21 +39,21 @@ Tensor& Conv2D::forward(Tensor& input){
 
     //If _out is correctly allocated
     if(
-        this->_out.shape._shapes != std::array<std::size_t,TENSOR_MAX_DIM>({batch_dim,c_out,out_h,out_w})
+        this->_forward_out.shape._shapes != std::array<std::size_t,TENSOR_MAX_DIM>({batch_dim,c_out,out_h,out_w})
     ){
-        this->_out.resize(Shape(out_shape));
+        this->_forward_out.resize(Shape(out_shape));
     }
 
     TensorMath::conv2D(
         input,
         kernels,
-        _out,
+        _forward_out,
         strides,
         padding
     );
 
 
-    return _out;
+    return _forward_out;
 }
 
 void Conv2D::update_weights(Tensor& input){

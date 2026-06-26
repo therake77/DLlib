@@ -6,6 +6,7 @@
 /* Define las dimensiones del tensor */
 class Shape{
 private:
+
     void _trigger_shape_recomposition();
 
 public:
@@ -23,5 +24,9 @@ public:
     bool operator!=(const Shape&) const;
 
     Shape unsqueeze(std::size_t);
+    void transpose();
+    void transpose(std::size_t,std::size_t);
+    void inner_pad(std::size_t);
+    void outer_pad(std::size_t);
     static void broadcast_shapes(Shape& a, Shape& b);
 };

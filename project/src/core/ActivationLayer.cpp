@@ -2,32 +2,97 @@
 #include <functional>
 #include <stdexcept>
 #include <math/TensorMath.hpp>
+#include <cassert>
 
 ActivationLayer::ActivationLayer(
-    std::array<std::size_t, TENSOR_MAX_DIM> _input_shape,
     ActivationTypes _type,
     std::shared_ptr<Device> dev 
-) : Layer(_input_shape,dev), type(_type) {}
+) : type(_type), Layer(dev) {}
 
-Tensor& ActivationLayer::forward(Tensor& input){
-    if(input.shape != this->_out.shape){
-        throw std::runtime_error("Input does not match expected output size");
-    }
+std::shared_ptr<Tensor> ActivationLayer::forward( const Tensor& in ){
+    /*Because all of them share the shape, we can do this*/
+    __check_initialization(this->_forward_out,in.shape);
+    __check_initialization(this->_backward_out,in.shape);
+    __check_initialization(this->_grad,in.shape);
 
+    /*Now, apply the operation*/
+    Tensor& forward_out = *(this->_forward_out);
     switch(this->type){
-        case(ActivationTypes::ReLU):{
-            TensorMath::reLU(input,this->_out);
-        }
-
+        case(ActivationTypes::ReLU) : {
+            TensorMath::reLU(
+                in,
+                forward_out
+            );
+            break;
+        };
         case(ActivationTypes::Sigmoid) : {
-            TensorMath::sigmoid(input,this->_out);
-        }
+            TensorMath::sigmoid(
+                in,
+                forward_out
+            );
+            break;
+        };
+        default : 
+            throw std::runtime_error("A unexpected type recevied");
+            break;
     }
 
-    return _out;
+    return this->_forward_out;
 }
 
-void ActivationLayer::update_weights(Tensor& incr){
-    //This layer does not hold weights
+std::shared_ptr<Tensor> ActivationLayer::backward( const Tensor& backward_grad, const Tensor& forward_input ){
+    assert(this->_backward_out.get() != nullptr && this->_grad.get() != nullptr && this->_forward_out.get() != nullptr );
+    //In is coming from the next layer
+    //This layer does not need to store a _grad. It has no weights
+    Tensor& backward_out = *(this->_backward_out);
+    switch(this->type){
+        case ActivationTypes::ReLU:
+            //Compute a binary mask based on the original forward input of this layer
+            TensorMath::binary_positive_mask(
+                forward_input,
+                backward_out
+            );
+
+            //Perform element_wise multiplication on the mask with the incoming gradient
+            TensorMath::multiply(
+                backward_grad,
+                backward_out,
+                backward_out
+            );
+            break;
+        case ActivationTypes::Sigmoid:{
+            //Compute 1 - \sigma(x) = 1 - forward_out. store it in backward_out
+            Tensor temp = Tensor({1},this->_dev,1.0,true);
+            Tensor& forward_out = *(this->_forward_out);
+            TensorMath::sub(
+                temp,
+                forward_out,
+                backward_out
+            );
+            //Compute \sigma(x)(1-\sigma(x)) = forward_out * backward_out
+            TensorMath::multiply(
+                forward_out,
+                backward_out,
+                backward_out
+            );
+            //Compute dL/dy * \sigma(x)*(1-\sigma(x)) = backward_grad * backward_out
+            //And store it in backward_out
+            TensorMath::multiply(
+                backward_out,
+                backward_grad,
+                backward_out
+            );
+            break;
+        }
+        default:
+            throw std::runtime_error("A unexpected type recevied");
+            break;
+    }
+    
+    return this->_backward_out;
+}
+
+void ActivationLayer::update_weight(){
+    //Does nothing: No weigths in this layer
     return;
 }

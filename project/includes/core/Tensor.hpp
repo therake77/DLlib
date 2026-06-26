@@ -30,7 +30,8 @@
         void resize(Shape s);
 
         Tensor& unsqueeze(std::size_t axis);
-
+        void inner_expand(std::size_t dims);
+        void outer_expand(std::size_t dims);
     };
 
 #endif

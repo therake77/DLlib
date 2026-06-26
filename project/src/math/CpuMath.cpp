@@ -333,14 +333,6 @@ void CpuMath::conv2D(
     }while(_increment_odometer(out_coords,out_shape._shapes));
 }
 
-void CpuMath::conv3D(
-    const float* in, Shape in_shape,
-    const float* ker, Shape ker_shape,
-    float* out, Shape out_shape,
-    std::array<size_t,3> stride, std::array<size_t,3> padding
-) {
-    throw std::runtime_error("Error: not implemented");
-}
 
 void CpuMath::reLU(const float* a, float* out, size_t n_elements) {
     for(size_t i = 0; i < n_elements; i++){
@@ -390,6 +382,8 @@ void CpuMath::max_pooling2D(
     const Shape input_shape,
     std::array<std::size_t,2> strides,  
     std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* mask,
+    const Shape mask_shape,
     float* out,
     const Shape out_shape,
     std::array<std::size_t, 2> padding
@@ -406,28 +400,73 @@ void CpuMath::max_pooling2D(
     do{
         std::fill(patch_coords.begin(),patch_coords.end(),0);
         float max_value = std::numeric_limits<float>::lowest();
+        std::size_t max_value_idx = 0;
         do{
             //Compute the coordinates of the input tensor
             std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
             std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            
+            std::size_t idx =  _compute_idx_from_coords({out_coords[0],out_coords[1], in_h, in_w},input_shape._strides);
             //If the computed coordinates are not in the padding region, compare the actual value
             if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
-                float value = input[ _compute_idx_from_coords(
-                    {out_coords[0],out_coords[1], in_h, in_w},
-                    input_shape._strides
-                )];
-                if( max_value < value ) max_value = value;
+                float value = input[idx];
+                mask[idx] = 0.0f;
+                if( max_value < value ){
+                    max_value = value;
+                    max_value_idx = idx;
+                }
             }else{
                 //The padding region. Value is zero
                 if( max_value < 0 ) max_value = 0;
             }
         }while(_increment_odometer(patch_coords,patch_shapes));
         out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = max_value;
+        mask[max_value_idx] = 1.0f;
     }while(_increment_odometer(out_coords,out_shape._shapes));
 
     return;
 }
+
+void CpuMath::inv_max_pooling2D(
+    const float* max_pooled,
+    const Shape max_pooled_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    const float* mask,
+    const Shape mask_shape,
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Both input and output should be 4 dimensional
+    assert( max_pooled_shape.n_dim == 4 && out_shape.n_dim == 4);
+    
+    //Odometer holders
+    std::vector<std::size_t> pool_coords(max_pooled_shape.n_dim,0);    //
+    std::vector<std::size_t> patch_coords(2,0);
+    std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
+
+    do{
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        do{
+            //Compute the coordinates of the output tensor
+            std::size_t out_h = pool_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t out_w = pool_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            std::size_t out_idx =  _compute_idx_from_coords({pool_coords[0],pool_coords[1], out_h, out_w},out_shape._strides);
+            //If the computed coordinates are not in the padding region, compare the actual value
+            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+                if(mask[out_idx] == 1){
+                    std::size_t pooled_idx = _compute_idx_from_coords(pool_coords,max_pooled_shape._strides);
+                    out[out_idx] = max_pooled[pooled_idx];
+                }else{
+                    out[out_idx] = 0;
+                }
+            }
+        }while(_increment_odometer(patch_coords,patch_shapes));
+    }while(_increment_odometer(pool_coords,max_pooled_shape._shapes));
+
+    return;
+}
+
 
 void CpuMath::avg_pooling2D(
     const float* input,
@@ -470,6 +509,40 @@ void CpuMath::avg_pooling2D(
         out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = sum/window_n_elements;
     }while(_increment_odometer(out_coords,out_shape._shapes));
 
+    return;
+}
+
+void CpuMath::inv_avg_pooling2D(
+    const float* avg_pooled,
+    const Shape avg_pooled_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Just for safety: put zeros on out. It is crucially important
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    do{
+        out[_compute_idx_from_coords(out_coords,out_shape._strides)] = 0;
+    }while(_increment_odometer(out_coords,out_shape._shapes));
+    //Now starts the logic
+    std::vector<std::size_t> pooled_coords(avg_pooled_shape.n_dim,0);
+    std::vector<std::size_t> patch_coords(2,0);
+    std::size_t window_n_elements = window_shapes[0] * window_shapes[1];
+    do{
+        std::size_t pooled_idx = _compute_idx_from_coords(pooled_coords,avg_pooled_shape._strides);
+        float to_add = avg_pooled[pooled_idx]/window_n_elements;
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        do{
+            std::size_t out_h = pooled_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t out_w = pooled_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            std::size_t out_idx =  _compute_idx_from_coords({pooled_coords[0],pooled_coords[1], out_h, out_w},out_shape._strides);
+            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+                out[out_idx] += to_add;
+            }
+        }while(_increment_odometer(patch_coords,out_shape._shapes));
+    }while(_increment_odometer(pooled_coords,avg_pooled_shape._shapes));
     return;
 }
 
@@ -563,4 +636,113 @@ void CpuMath::transpose(
             coords[i] = 0;
         }
     }
+}
+/*
+    @brief Filters positive values from `in`, zeroing negative values. Shapes must be equal
+*/
+void CpuMath::binary_positive_mask(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape
+){
+    //Iterate both tensors using a unique odometer
+    std::vector<std::size_t> coords(out_shape.n_dim,0);
+    do{
+        std::size_t in_idx = _compute_idx_from_coords(coords,in_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+        out[out_idx] = in[in_idx] > 0 ? 1 : 0;
+    }while(_increment_odometer(coords,out_shape._shapes));
+}
+
+void CpuMath::mean(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //It will be assumed that out_shape is 1 dimensional 
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+    assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        out[coords[axis]] += in[_compute_idx_from_coords(coords,in_shape._strides)];
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //The total number of elements is the product of all shapes. So is just shape.n_elements/acc_dim
+    float M = in_shape.n_elements/acc_dim;
+    for(std::size_t i = 0 ; i < acc_dim; i++){
+        out[i]/=M;
+    }
+    return;
+}
+
+void CpuMath::variance(
+    const float* in,
+    const Shape& in_shape,
+    const float* mean,
+    const Shape& mean_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //It will be assumed that out and mean are 1-dimensional
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+
+    assert(out_shape.n_dim == 1 && mean_shape.n_dim == 1);
+    assert(out_shape[0] == acc_dim && mean_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }    
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        std::size_t curr_acc_idx = coords[axis]; 
+        std::size_t curr_idx = _compute_idx_from_coords(coords,in_shape._strides); 
+        out[curr_acc_idx] += std::pow(in[curr_idx] - mean[curr_acc_idx],2);
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //The total number of elements is the product of all shapes. So is just shape.n_elements/in[acc_dim]
+    float M = in_shape.n_elements/acc_dim;
+    for(std::size_t i = 0 ; i < acc_dim; i++){
+        out[i]/=M;
+    }
+    return;
+}
+
+void CpuMath::reduce_all(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //out_shape MUST BE 1 dimensional (this is a reduction of all axis except one)
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+    assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        out[coords[axis]] += in[_compute_idx_from_coords(coords,in_shape._strides)];
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //End: out now has the reduced sums
+    return;
 }

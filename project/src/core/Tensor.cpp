@@ -154,5 +154,17 @@ void Tensor::resize(Shape s){
 
 Tensor& Tensor::unsqueeze(std::size_t axis){
     this->shape = this->shape.unsqueeze(axis);
+    return *this;
+}
+
+void Tensor::inner_expand(std::size_t dims){
+    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
+    this->shape.inner_pad(dims);
+    return;
+}
+
+void Tensor::outer_expand(std::size_t dims){
+    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
+    this->shape.outer_pad(dims);
     return;
 }
