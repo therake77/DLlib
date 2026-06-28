@@ -48,9 +48,9 @@ void fancy_print(Tensor& a){
 }
 
 void matmul_test(std::shared_ptr<Device> device){
-    Tensor a = Tensor({2,1,1}, device, 7.0f);
-    Tensor b = Tensor({1,3}, device, 2.0f);
-    Tensor c = Tensor({2,1,3}, device);
+    Tensor a = Tensor({2,1,1}, device, 7.0f,true);
+    Tensor b = Tensor({1,3}, device, 2.0f,true);
+    Tensor c = Tensor({2,1,3}, device,0.0f,true);
     try{
         fancy_print(a);
         fancy_print(b);

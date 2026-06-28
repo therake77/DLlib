@@ -24,9 +24,15 @@ include_directories(project/includes)
 
 set(SRC_FILES
     project/src/core/ConvLayer.cpp
+    project/src/core/FullyConnected.cpp
+    project/src/core/ActivationLayer.cpp
+    project/src/core/BatchNormLayer.cpp
     project/src/core/Pooling.cpp
+    project/src/core/Flatten.cpp
+    project/src/core/OutputLayer.cpp
     project/src/core/Tensor.cpp
     project/src/core/Shape.cpp
+    project/src/core/ConvNeuralNetwork.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
@@ -54,11 +60,13 @@ target_link_libraries(conv_layer_test PRIVATE cnn_lib)
 add_executable(pooling_test tests/pooling_test.cpp)
 target_link_libraries(pooling_test PRIVATE cnn_lib)
 
+add_executable(cnn_test tests/cnn_test.cpp)
+target_link_libraries(cnn_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(pooling_test PRIVATE CUDA::cuda_driver)
-
+    target_link_libraries(cnn_test PRIVATE CUDA::cuda_driver)
 endif()

@@ -3,7 +3,6 @@
 
 class CpuDevice : public Device {
 public:
-
     ~CpuDevice() override = default;
 
     CpuDevice(){ this->math = std::make_unique<CpuMath>(); };

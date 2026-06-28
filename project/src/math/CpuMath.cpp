@@ -68,72 +68,236 @@ namespace{
 
 };
 
+/*
+    @brief Adds two tensors
+    @param a First operand
+    @param a_shape Shape of first operand
+    @param b Second operand
+    @param b_shape Shape of second operand
+    @param out Output tensor
+    @param out_shape Shape of output tensor
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::add(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
 
-void CpuMath::add(const float* a, const float* b, float* out, size_t size){
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] + b[i];
-    }
+        out[out_idx] = a[a_idx] + b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
-void CpuMath::sub(const float* a, const float* b, float* out, size_t size) {
+/*
+    @brief Subtracts two tensors
+    @param a Pointer to first tensor operand data
+    @param a_shape Shape of first operand
+    @param b Pointer to second tensor operand data
+    @param b_shape Shape of second operand
+    @param out Pointer to output tensor data
+    @param out_shape Shape of output tensor
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::sub(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+) {
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
 
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] - b[i];
-    }
+        out[out_idx] = a[a_idx] - b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
-void CpuMath::scale(const float* a, float* out, float _n, size_t size) {
-    for(size_t i = 0; i < size; i++){
+
+/*
+    @brief Scales a tensor up to a fixed float constant
+    @param a Pointer to input data container 
+    @param out Pointer to output data container
+    @param _n Scalar
+    @param shape Shared shape (out and a must have the same shape)
+    
+*/
+void CpuMath::scale(const float* a, float* out, float _n, Shape shape) {
+    for(size_t i = 0; i < shape.n_elements; i++){
         out[i] = _n*a[i];
     }
 }
 
-void CpuMath::multiply(const float* a, const float* b, float* out, size_t size) {
-    for(size_t i = 0; i < size; i++){
-        out[i] = a[i] * b[i];
-    }
+/*
+    @brief Performs division elementwise between `a` and `b`
+    @param a Pointer of first input data container
+    @param a_shape Shape of first input data container
+    @param b Pointer of second input data container
+    @param b_shape Shape of second input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::divide(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = a[a_idx] / b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
 }
 
-/* Contracts two tensors on the two innermost dimensions
-Expects: Two tensors, of shape (A,B,C,...,M,K) and (A,B,C,...,K,N)
-Input tensors must have been broadcasted up to TENSOR_MAX_DIM, and output tensor must have been expanded to the same length
+/*
+    @brief Performs the square root operation elementwise over `a`
+    @param a Pointer of first input data container
+    @param a_shape Shape of first input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::sqrt(const float* a,  Shape a_shape, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = std::sqrt(a[a_idx]); 
+    }while(_increment_odometer(coords,shapes));
+}
+
+/*
+    @brief Performs a `pow` operation with power `_n` elementwise over `a`
+    @param a Pointer of first input data container
+    @param a_shape Shape of first input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::pow(const float* a,  Shape a_shape, int _n, float* out, Shape out_shape){
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = std::pow(a[a_idx],_n); 
+    }while(_increment_odometer(coords,shapes));
+}
+
+
+void CpuMath::log(const float* a,  Shape a_shape, float* out, Shape out_shape){
+    assert(a_shape == out_shape);
+
+    std::vector<std::size_t> coords(a_shape.n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(
+            coords,
+            a_shape._strides
+        );
+        std::size_t out_idx = _compute_idx_from_coords(
+            coords,
+            out_shape._strides
+        );
+        out[out_idx] = std::log(a[a_idx]);
+    }while(_increment_odometer(coords,a_shape._shapes));
+}
+
+
+/*
+    @brief Performs multiplication elementwise between `a` and `b`
+    @param a Pointer of first input data container
+    @param a_shape Shape of first input data container
+    @param b Pointer of second input data container
+    @param b_shape Shape of second input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
+*/
+void CpuMath::multiply(
+    const float* a,  Shape a_shape, 
+    const float* b, Shape b_shape, 
+    float* out, Shape out_shape
+) {
+    // All shapes are equal, and have the same dimensionality
+    auto n_dim = a_shape.n_dim;
+    auto shapes = a_shape._shapes;
+    std::vector<std::size_t> coords(n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(coords,a_shape._strides);
+        std::size_t b_idx = _compute_idx_from_coords(coords,b_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+
+        out[out_idx] = a[a_idx] * b[b_idx]; 
+    }while(_increment_odometer(coords,shapes));
+}
+
+/*
+    @brief Performs a tensor contraction on the two innermost dimensions between `a` and `b`
+    @param a Pointer of first input data container
+    @param a_shape Shape of first input data container
+    @param b Pointer of second input data container
+    @param b_shape Shape of second input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note The method is specially designed to support broadcasted tensors, using the provided shape strides
 */
 void CpuMath::matmul(
     const float* a , Shape a_shape,
     const float* b , Shape b_shape,
     float* out, Shape out_shape
 ) {
+    
+    assert(a_shape.n_dim == b_shape.n_dim && b_shape.n_dim == out_shape.n_dim);
+    std::size_t max_dim = a_shape.n_dim;
     //Simple check: ¿ do they even have the max dimension ?
-    if(a_shape.n_dim != TENSOR_MAX_DIM || b_shape.n_dim != TENSOR_MAX_DIM || out_shape.n_dim != TENSOR_MAX_DIM){
-        throw std::runtime_error("Error: Shapes are not broadcasted");
-    }
 
     /*Basic validation*/
-    if(a_shape[TENSOR_MAX_DIM-1] != b_shape[TENSOR_MAX_DIM-2]){ throw std::runtime_error("Error: Expected shape (...,M,K); (...,K,N)  "); }
-    if(a_shape[TENSOR_MAX_DIM-2] != out_shape[TENSOR_MAX_DIM-2] || b_shape[TENSOR_MAX_DIM-1] != out_shape[TENSOR_MAX_DIM-1]){ throw std::runtime_error("Error: Expected shape (...,M,N)"); }
+    if(a_shape[max_dim-1] != b_shape[max_dim-2]){ throw std::runtime_error("Error: Expected shape (...,M,K); (...,K,N)  "); }
+    if(a_shape[max_dim-2] != out_shape[max_dim-2] || b_shape[max_dim-1] != out_shape[max_dim-1]){ throw std::runtime_error("Error: Expected shape (...,M,N)"); }
     
-    for(size_t i = TENSOR_MAX_DIM - 2 ; i-->0; ){
+    for(size_t i = max_dim - 2 ; i-->0; ){
         if(a_shape[i] != b_shape[i] || b_shape[i] != out_shape[i] ){ throw std::runtime_error("Error: Bad broadcasting detected"); }
     }
 
-    size_t M = out_shape[TENSOR_MAX_DIM - 2];
-    size_t N = out_shape[TENSOR_MAX_DIM - 1];
-    size_t K = a_shape[TENSOR_MAX_DIM - 1];
-    size_t stride_am = a_shape._strides[TENSOR_MAX_DIM - 2];
-    size_t stride_ak = a_shape._strides[TENSOR_MAX_DIM - 1];
-    size_t stride_bk = b_shape._strides[TENSOR_MAX_DIM - 2];
-    size_t stride_bn = b_shape._strides[TENSOR_MAX_DIM - 1];
-    size_t stride_outm = out_shape._strides[TENSOR_MAX_DIM - 2];
-    size_t stride_outn = out_shape._strides[TENSOR_MAX_DIM - 1];
+    size_t M = out_shape[max_dim - 2];
+    size_t N = out_shape[max_dim - 1];
+    size_t K = a_shape[max_dim - 1];
+    size_t stride_am = a_shape._strides[max_dim - 2];
+    size_t stride_ak = a_shape._strides[max_dim - 1];
+    size_t stride_bk = b_shape._strides[max_dim - 2];
+    size_t stride_bn = b_shape._strides[max_dim - 1];
+    size_t stride_outm = out_shape._strides[max_dim - 2];
+    size_t stride_outn = out_shape._strides[max_dim - 1];
     
     /*Now comes the main algorithm*/
     /* Calculate number of "batches" */
     size_t total_batches = 1;
-    for(size_t i = 0; i < TENSOR_MAX_DIM - 2; ++i){
+    for(size_t i = 0; i < max_dim - 2; ++i){
         total_batches*= a_shape[i];
     }
     
-    std::vector<size_t> coords(TENSOR_MAX_DIM-2,0);
+    std::vector<size_t> coords(max_dim-2,0);
     size_t count = 0;
 
     while(count < total_batches){
@@ -142,7 +306,7 @@ void CpuMath::matmul(
         const float* b_slice = b;
         float* out_slice = out;
         
-        for(size_t i = 0; i < TENSOR_MAX_DIM -2; ++i){
+        for(size_t i = 0; i < max_dim -2; ++i){
             a_slice += coords[i] * a_shape._strides[i];
             b_slice += coords[i] * b_shape._strides[i];
             out_slice += coords[i] * out_shape._strides[i];
@@ -159,7 +323,7 @@ void CpuMath::matmul(
         if(count == total_batches) break;
 
         /*odometer*/
-        for(size_t i = TENSOR_MAX_DIM - 2; i --> 0; ){
+        for(size_t i = max_dim - 2; i --> 0; ){
             coords[i]++;
             if(coords[i] < a_shape[i]) break; //a_shape[i] = b_shape[i] = out_shape[i] (because of broadcasting)
             coords[i] = 0;
@@ -169,11 +333,14 @@ void CpuMath::matmul(
 }
 
 /*
-Convolution in 2 dimensions. 
-Expects:
-- Float data pointer of a tensor input `in` with shape (Batch, Channel, Height, Width)
-- Float data pointer of a tensor kernel `ker` with shape (N_kernels, Channel, Ker_height, Ker_width )
-- Nonconst float data pointer of a tensor `out` with shape (Batch, N_kernels, Out_height, Out_width)
+    @brief Performs 2D convolution over `in` given the batch of kernels `ker`. 
+    @param in Pointer to the 4D input tensor
+    @param in_shape Shape of the 4D input tensor
+    @param ker Pointer to the 4D kernel tensor
+    @param ker_shape Shape of the 4D kernel tensor
+    @param out Pointer to the output data container
+    @param out_shape Shape of the output data container
+    @note It was specifically designed for 4D tensors
 */
 void CpuMath::conv2D(
     const float* in, const Shape in_shape,
@@ -239,21 +406,128 @@ void CpuMath::conv2D(
     }while(_increment_odometer(out_coords,out_shape._shapes));
 }
 
-void CpuMath::conv3D(
+/*
+    @brief Given a input (image), and a series of parameters describing a 'window-sliding' operation, 
+    extracts each possible window as a row of a matrix.
+    @note The routine assumes `ìn` is 4-dimensional (N,C,H,W)   
+*/
+void CpuMath::im2col2d(
     const float* in, Shape in_shape,
-    const float* ker, Shape ker_shape,
     float* out, Shape out_shape,
-    std::array<size_t,3> stride, std::array<size_t,3> padding
-) {
-    throw std::runtime_error("Error: not implemented");
+    std::array<std::size_t,2> window_shape,
+    std::array<std::size_t,2> strides,
+    std::array<std::size_t,2> padding
+){
+    using dim_t = std::size_t;
+    assert(out_shape.n_dim == 2);
+    //Compute the original height and width of the output (as if it was a normal window-sliding operation)
+    dim_t N = in_shape[0], C = in_shape[1], H = in_shape[2], W = in_shape[3];
+    dim_t H_window = window_shape[0], W_window = window_shape[1];
+    
+    dim_t H_out = (H + 2 * padding[0] - H_window) / strides[0] + 1;
+    dim_t W_out = (W + 2 * padding[1] - W_window) / strides[1] + 1;
+    //Iterate over the out array
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    //For each index in the output matrix
+    do{
+        dim_t rows = out_coords[0], cols = out_coords[1];
+        //Compute what element in the input tensor corresponds to this index
+        dim_t delta_w = rows % W_window;
+        dim_t delta_h = (rows/W_window) % H_window;
+        dim_t c = rows / (H_window * W_window);
+        dim_t w_out = cols % W_out;
+        dim_t h_out = (cols/W_out) % H_out;
+        dim_t n = cols / (H_out * W_out);
+        dim_t h_in = h_out * strides[0] - padding[0] + delta_h;
+        dim_t w_in = w_out * strides[1] - padding[1] + delta_w;
+        dim_t out_idx = _compute_idx_from_coords(out_coords,out_shape._strides);
+        if( h_in < H || w_in < W){
+            dim_t in_idx = _compute_idx_from_coords({n,c,h_in,w_in}, in_shape._strides);
+            out[out_idx] = in[in_idx];
+        }else{
+            out[out_idx] = 0.0f;
+        }
+    }while(_increment_odometer(out_coords,out_shape._shapes));
 }
 
+/*
+    @brief Given a matrix (col), and a series of parameters describing a 'window-sliding' operation that was perfomed, 
+    reconstructs the shapes of the original tensor (image), using accumulation over the overlapping indices.
+    @note The routine assumes `ìn` is 2-dimensional (N,C,H,W), `out` is 4-dimensional, and out is zeroed.   
+*/
+void CpuMath::col2im2d(
+    const float* in, Shape in_shape,
+    float* out, Shape out_shape,
+    std::array<std::size_t,2> window_shape,
+    std::array<std::size_t,2> strides,
+    std::array<std::size_t,2> padding
+){
+    //Out should be zeroed
+    //Dimensionality safeguard 
+    assert(in_shape.n_dim == 2 && out_shape.n_dim == 4);
+    
+    using dim_t = std::size_t;
+    
+    //Compute the original height and width of the output (as if it was a normal window-sliding operation)
+    dim_t N = out_shape[0], C = out_shape[1], H = out_shape[2], W = out_shape[3];
+    dim_t rows = in_shape[0], cols = in_shape[1];
+    dim_t H_window = window_shape[0], W_window = window_shape[1];
+    
+    dim_t H_in = (H + 2 * padding[0] - H_window) / strides[0] + 1;
+    dim_t W_in = (W + 2 * padding[1] - W_window) / strides[1] + 1;
+    //Iterate over the out array
+    std::vector<std::size_t> in_coords(in_shape.n_dim,0);
+    //For each index in the output matrix
+    do{
+        //Compute what element in the input tensor corresponds to this index
+        dim_t delta_w = rows % W_window;
+        dim_t delta_h = (rows/W_window) % H_window;
+        dim_t c = rows / (H_window * W_window);
+        dim_t w_in = cols % W_in;
+        dim_t h_in = (cols/W_in) % H_in;
+        dim_t n = cols / (H_in * W_in);
+        dim_t h_out = h_in * strides[0] - padding[0] + delta_h;
+        dim_t w_out = w_in * strides[1] - padding[1] + delta_w;
+        dim_t in_idx = _compute_idx_from_coords(in_coords,in_shape._shapes);
+        if( h_in < H || w_in < W){
+            dim_t out_idx = _compute_idx_from_coords({n,c,h_out,w_out}, out_shape._strides);
+            out[out_idx] += in[in_idx];
+        }
+    }while(_increment_odometer(in_coords,in_shape._shapes));
+
+}
+
+
+
+
+
+
+
+
+/*
+    @brief Performs reLU operation elementwise over `a`
+    @param a Pointer of input data container
+    @param a_shape Shape of input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note This method does not support broadcasting between `a` and `out`
+    @note This method can safely accept that `a` points to the same container as `out`
+*/
 void CpuMath::reLU(const float* a, float* out, size_t n_elements) {
     for(size_t i = 0; i < n_elements; i++){
         out[i] = std::max(a[i],0.0f);
     }
 }
 
+/*
+    @brief Performs sigmoid function operation elementwise over `a`
+    @param a Pointer of input data container
+    @param a_shape Shape of input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note This method does not support broadcasting between `a` and `out`
+    @note This method can safely accept that `a` points to the same container as `out`
+*/
 void CpuMath::sigmoid(const float* a, float* out, size_t n_elements) {
     for(size_t i = 0; i < n_elements; i++){
         if(a[i] >= 0.0f){
@@ -265,37 +539,125 @@ void CpuMath::sigmoid(const float* a, float* out, size_t n_elements) {
     }
 }
 
+/*
+    @brief Performs tanh function operation elementwise over `a`
+    @param a Pointer of input data container
+    @param a_shape Shape of input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note This method does not support broadcasting between `a` and `out`
+    @note This method can safely accept that `a` points to the same container as `out`
+*/
 void CpuMath::tanh(const float* a, float* out, size_t n_elements) {
     for(size_t i = 0; i < n_elements; i++){
         out[i] = std::tanh(a[i]);
     }
 }
 
-/*Assumes the input is a 1D tensor (a vector)*/
-void CpuMath::softmax(const float* a, float* out, size_t n_elements) {
-    float acc = 0.0f;
-    for(size_t i = 0; i < n_elements; i++){
-        acc += std::exp(a[i]);
-    }
-    if( std::abs(acc) < std::numeric_limits<float>::epsilon() ){ throw std::runtime_error("Error: Encountered division by zero"); }
-    for(size_t i = 0; i < n_elements; i++){
-        out[i] = std::exp(a[i]) / acc;
-    }
+/*
+    @brief Performs softmax operation elementwise over `a`
+    @param a Pointer of input data container
+    @param a_shape Shape of input data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @note This method does not support broadcasting between `a` and `out`
+    @note This method can safely accept that `a` points to the same container as `out`
+    @note `a` MUST BE a 1D tensor
+*/
+void CpuMath::softmax(
+    const float* a,
+    Shape a_shape, 
+    float* out,
+    Shape out_shape
+) {
+    assert(out_shape == a_shape);
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    std::size_t last_dim = out_shape._shapes[out_shape.n_dim-1];
+    std::size_t a_last_stride = a_shape._strides[out_shape.n_dim-1];
+    std::size_t out_last_stride = out_shape._strides[out_shape.n_dim-1];
+
+    do{
+        if(out_coords[out_shape.n_dim-1] == 0){
+            std::size_t a_base_idx = _compute_idx_from_coords(
+                out_coords,
+                a_shape._strides
+            );
+
+            std::size_t out_base_idx = _compute_idx_from_coords(
+                out_coords,
+                out_shape._strides
+            );
+
+            std::vector<float> acc(last_dim,0);
+            float sum = 0;
+            float max = std::numeric_limits<float>::lowest();
+            //First, find the maximum element
+            for(std::size_t i = 0; i < last_dim; i++){
+                std::size_t a_global_idx = a_base_idx + i * a_last_stride;
+                if(a[a_global_idx] > max) max = a[a_global_idx]; 
+            }
+            //Now, compute e^{x - max}
+            for(std::size_t i = 0; i < last_dim; i++){
+                std::size_t a_global_idx = a_base_idx + i * a_last_stride;
+                std::size_t out_global_idx = out_base_idx + i * out_last_stride;
+                float num = std::exp(a[a_global_idx] - max);
+                out[out_global_idx] = num; 
+                sum +=  num;
+            }
+            //Divide by the accumulated sum
+            for(std::size_t i = 0; i < last_dim; i++){
+                std::size_t out_global_idx = out_base_idx + i * out_last_stride;
+                out[out_global_idx] /= sum; 
+            }
+        }
+    }while(_increment_odometer(out_coords,out_shape._shapes));
+    return;
 }
 
+/*
+    @brief Sum two tensors along a specified axis
+    @note Out should be zeroes before invoking this routine
+*/
 void CpuMath::sum(
     const float* a, Shape a_shape, 
     float* out, Shape out_shape ,
     size_t axis
 ) {
-    throw std::runtime_error("Error: not implemented");
+    assert(a_shape == out_shape);
+    std::size_t axis_dim = a_shape[axis];
+    std::vector<std::size_t> coords(a_shape.n_dim,0);
+    do{
+        std::size_t a_idx = _compute_idx_from_coords(
+            coords,
+            a_shape._strides
+        );
+        std::size_t out_idx = _compute_idx_from_coords(
+            coords,
+            out_shape._strides
+        );
+        out[out_idx] += a[a_idx];
+    }while(_increment_odometer(coords,a_shape._shapes));
 }
 
+/*
+    @brief Slides a window over `input`, extracting the maximum value and storing the position of the maximum value on the original tensor as a binary mask
+    @param input Pointer of input data container
+    @param input_shape Shape of input data container
+    @param strides The strides of the sliding window
+    @param window_shapes The dimensions of the sliding window. Is assumed is a 2D window
+    @param mask Pointer to the mask data container
+    @param mask_shape Shape of the mask data container
+    @param out Pointer of output data container
+    @param out_shape Shape of output data container
+    @param padding Padding for the sliding window operation
+*/
 void CpuMath::max_pooling2D(
     const float* input,
     const Shape input_shape,
     std::array<std::size_t,2> strides,  
     std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* mask,
+    const Shape mask_shape,
     float* out,
     const Shape out_shape,
     std::array<std::size_t, 2> padding
@@ -312,28 +674,73 @@ void CpuMath::max_pooling2D(
     do{
         std::fill(patch_coords.begin(),patch_coords.end(),0);
         float max_value = std::numeric_limits<float>::lowest();
+        std::size_t max_value_idx = 0;
         do{
             //Compute the coordinates of the input tensor
             std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
             std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            
+            std::size_t idx =  _compute_idx_from_coords({out_coords[0],out_coords[1], in_h, in_w},input_shape._strides);
             //If the computed coordinates are not in the padding region, compare the actual value
             if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
-                float value = input[ _compute_idx_from_coords(
-                    {out_coords[0],out_coords[1], in_h, in_w},
-                    input_shape._strides
-                )];
-                if( max_value < value ) max_value = value;
+                float value = input[idx];
+                mask[idx] = 0.0f;
+                if( max_value < value ){
+                    max_value = value;
+                    max_value_idx = idx;
+                }
             }else{
                 //The padding region. Value is zero
                 if( max_value < 0 ) max_value = 0;
             }
         }while(_increment_odometer(patch_coords,patch_shapes));
         out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = max_value;
+        mask[max_value_idx] = 1.0f;
     }while(_increment_odometer(out_coords,out_shape._shapes));
 
     return;
 }
+
+void CpuMath::inv_max_pooling2D(
+    const float* max_pooled,
+    const Shape max_pooled_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    const float* mask,
+    const Shape mask_shape,
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Both input and output should be 4 dimensional
+    assert( max_pooled_shape.n_dim == 4 && out_shape.n_dim == 4);
+    
+    //Odometer holders
+    std::vector<std::size_t> pool_coords(max_pooled_shape.n_dim,0);    //
+    std::vector<std::size_t> patch_coords(2,0);
+    std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
+
+    do{
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        do{
+            //Compute the coordinates of the output tensor
+            std::size_t out_h = pool_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t out_w = pool_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            std::size_t out_idx =  _compute_idx_from_coords({pool_coords[0],pool_coords[1], out_h, out_w},out_shape._strides);
+            //If the computed coordinates are not in the padding region, compare the actual value
+            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+                if(mask[out_idx] == 1){
+                    std::size_t pooled_idx = _compute_idx_from_coords(pool_coords,max_pooled_shape._strides);
+                    out[out_idx] = max_pooled[pooled_idx];
+                }else{
+                    out[out_idx] = 0;
+                }
+            }
+        }while(_increment_odometer(patch_coords,patch_shapes));
+    }while(_increment_odometer(pool_coords,max_pooled_shape._shapes));
+
+    return;
+}
+
 
 void CpuMath::avg_pooling2D(
     const float* input,
@@ -376,6 +783,40 @@ void CpuMath::avg_pooling2D(
         out[ _compute_idx_from_coords(out_coords,out_shape._strides) ] = sum/window_n_elements;
     }while(_increment_odometer(out_coords,out_shape._shapes));
 
+    return;
+}
+
+void CpuMath::inv_avg_pooling2D(
+    const float* avg_pooled,
+    const Shape avg_pooled_shape,
+    std::array<std::size_t,2> strides,  
+    std::array<std::size_t,2> window_shapes,    //(Height , Width)
+    float* out,
+    const Shape out_shape,
+    std::array<std::size_t, 2> padding
+){
+    //Just for safety: put zeros on out. It is crucially important
+    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
+    do{
+        out[_compute_idx_from_coords(out_coords,out_shape._strides)] = 0;
+    }while(_increment_odometer(out_coords,out_shape._shapes));
+    //Now starts the logic
+    std::vector<std::size_t> pooled_coords(avg_pooled_shape.n_dim,0);
+    std::vector<std::size_t> patch_coords(2,0);
+    std::size_t window_n_elements = window_shapes[0] * window_shapes[1];
+    do{
+        std::size_t pooled_idx = _compute_idx_from_coords(pooled_coords,avg_pooled_shape._strides);
+        float to_add = avg_pooled[pooled_idx]/window_n_elements;
+        std::fill(patch_coords.begin(),patch_coords.end(),0);
+        do{
+            std::size_t out_h = pooled_coords[2] * strides[0] - padding[0] + patch_coords[0];
+            std::size_t out_w = pooled_coords[3] * strides[1] - padding[1] + patch_coords[1];
+            std::size_t out_idx =  _compute_idx_from_coords({pooled_coords[0],pooled_coords[1], out_h, out_w},out_shape._strides);
+            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+                out[out_idx] += to_add;
+            }
+        }while(_increment_odometer(patch_coords,out_shape._shapes));
+    }while(_increment_odometer(pooled_coords,avg_pooled_shape._shapes));
     return;
 }
 
@@ -469,4 +910,113 @@ void CpuMath::transpose(
             coords[i] = 0;
         }
     }
+}
+/*
+    @brief Filters positive values from `in`, zeroing negative values. Shapes must be equal
+*/
+void CpuMath::binary_positive_mask(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape
+){
+    //Iterate both tensors using a unique odometer
+    std::vector<std::size_t> coords(out_shape.n_dim,0);
+    do{
+        std::size_t in_idx = _compute_idx_from_coords(coords,in_shape._strides);
+        std::size_t out_idx = _compute_idx_from_coords(coords,out_shape._strides);
+        out[out_idx] = in[in_idx] > 0 ? 1 : 0;
+    }while(_increment_odometer(coords,out_shape._shapes));
+}
+
+void CpuMath::mean(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //It will be assumed that out_shape is 1 dimensional 
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+    assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        out[coords[axis]] += in[_compute_idx_from_coords(coords,in_shape._strides)];
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //The total number of elements is the product of all shapes. So is just shape.n_elements/acc_dim
+    float M = in_shape.n_elements/acc_dim;
+    for(std::size_t i = 0 ; i < acc_dim; i++){
+        out[i]/=M;
+    }
+    return;
+}
+
+void CpuMath::variance(
+    const float* in,
+    const Shape& in_shape,
+    const float* mean,
+    const Shape& mean_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //It will be assumed that out and mean are 1-dimensional
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+
+    assert(out_shape.n_dim == 1 && mean_shape.n_dim == 1);
+    assert(out_shape[0] == acc_dim && mean_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }    
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        std::size_t curr_acc_idx = coords[axis]; 
+        std::size_t curr_idx = _compute_idx_from_coords(coords,in_shape._strides); 
+        out[curr_acc_idx] += std::pow(in[curr_idx] - mean[curr_acc_idx],2);
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //The total number of elements is the product of all shapes. So is just shape.n_elements/in[acc_dim]
+    float M = in_shape.n_elements/acc_dim;
+    for(std::size_t i = 0 ; i < acc_dim; i++){
+        out[i]/=M;
+    }
+    return;
+}
+
+void CpuMath::reduce_all(
+    const float* in,
+    const Shape& in_shape,
+    float* out,
+    const Shape& out_shape,
+    std::size_t axis
+){
+    //out_shape MUST BE 1 dimensional (this is a reduction of all axis except one)
+    assert(axis < in_shape.n_dim);
+    std::size_t acc_dim = in_shape[axis];
+    assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
+
+    //As a safety measure, put zeros on out
+    for(std::size_t i = 0; i < out_shape[0]; i++){
+        out[i] = 0.0f;
+    }
+
+    //Prepare the odometer
+    std::vector<std::size_t> coords(in_shape.n_dim,0);
+    do{
+        out[coords[axis]] += in[_compute_idx_from_coords(coords,in_shape._strides)];
+    }while(_increment_odometer(coords,in_shape._shapes));
+    //End: out now has the reduced sums
+    return;
 }
