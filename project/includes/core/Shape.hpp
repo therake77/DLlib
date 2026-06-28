@@ -28,5 +28,5 @@ public:
     void transpose(std::size_t,std::size_t);
     void inner_pad(std::size_t);
     void outer_pad(std::size_t);
-    static void broadcast_shapes(Shape& a, Shape& b);
+    static void broadcast_shapes(Shape& a, Shape& b,std::size_t ignore = 0);
 };

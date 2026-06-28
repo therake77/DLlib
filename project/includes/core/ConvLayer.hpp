@@ -2,15 +2,11 @@
 
 class Conv2D : public Layer{
 private:
-    std::shared_ptr<Device> device;
-    Tensor _kernels;
-    Tensor _grad;
-
+    Tensor _kernels;    //(C_out, C_in, K_h, K_w)
+    std::unique_ptr<Tensor> _forward_col_input;
     std::array<size_t,2> padding;
     std::array<size_t,2> strides;
 public:
-    Tensor& kernels = _kernels;
-    Tensor& grad = _grad;
     
     ~Conv2D() override = default;
 

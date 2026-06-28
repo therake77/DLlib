@@ -23,22 +23,20 @@ public:
     virtual void update_weight() = 0;
     inline void set_mode(LayerMode mode){ this->mode = mode; }
 
-    void __check_initialization(std::shared_ptr<Tensor>& t, Shape s, bool throws = false ){
-        if(t.get() == nullptr || t->shape != s){
-            if(throws){ throw std::runtime_error("Tensor not initialized"); }
-            else{
-                t = std::make_shared<Tensor>(Tensor(s._shapes,this->_dev));
-            }
+    void __check_initialization(std::shared_ptr<Tensor>& t, Shape s){
+        if(t.get() == nullptr){
+            t = std::make_shared<Tensor>(Tensor(s._shapes,this->_dev));
+        }else if(t->shape != s){
+            t->resize(s);
         }
         return;
     }
 
-    void __check_initialization(std::unique_ptr<Tensor>& t, Shape s, bool throws = false){
-        if(t.get() == nullptr || t->shape != s){
-            if(throws){ throw std::runtime_error("Tensor not initialized"); }
-            else{
-                t = std::make_unique<Tensor>(Tensor(s._shapes,this->_dev));
-            }
+    void __check_initialization(std::unique_ptr<Tensor>& t, Shape s){
+        if(t.get() == nullptr){
+            t = std::make_unique<Tensor>(Tensor(s._shapes,this->_dev));
+        }else if(t->shape != s){
+            t->resize(s);
         }
         return;
     }

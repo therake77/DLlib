@@ -1,19 +1,17 @@
 #include <core/ConvLayer.hpp>
 #include <math/TensorMath.hpp>
+#include <cassert>
 
 Conv2D::Conv2D(
     std::array<size_t, 4> kernel_shape,
     std::shared_ptr<Device> dev,
     std::array<size_t,2> _padding,
     std::array<size_t,2> _strides)
-  : _kernels(kernel_shape,dev), 
-    _grad(kernel_shape,dev), 
+  : _kernels(kernel_shape,dev,1.0f,true),   //TODO(TEMPORAL, CHANGE THIS)
     padding(_padding),
     strides(_strides),
-    Layer({1,1,1,1},dev)
-{
-    this->device = dev;
-}
+    Layer(dev)
+{}
 
 /*
 @brief Computes the forward pass of a convolution layer
@@ -22,41 +20,101 @@ Conv2D::Conv2D(
 @result A new, freshly allocated tensor if no output was given, else `void`
 @note It is absolutely not recommended to pass the input tensor as the output tensor, as the method will overwrite data during the operation
 */
-Tensor& Conv2D::forward(Tensor& input){
-    size_t batch_dim = input.shape[0];
-    size_t c_out = this->kernels.shape[0];
-    
-    //out shape is (Batch, N_features, out_h, out_w)
-    
-    size_t out_h = ((input.shape[2] - kernels.shape[2] + 2 * padding[0]) / strides[0]) + 1;
-    size_t out_w = ((input.shape[3] - kernels.shape[3] + 2 * padding[1]) / strides[1]) + 1;
-    std::array<size_t, TENSOR_MAX_DIM> out_shape {
-        batch_dim,
-        c_out,
-        out_h,
-        out_w
-    };
+ std::shared_ptr<Tensor> Conv2D::forward( const Tensor& in){
+    //Compute convolution
+    using dim_t = std::size_t;
+    dim_t features = _kernels.shape[0];
+    dim_t channels = _kernels.shape[1];
+    dim_t kernel_height = _kernels.shape[2];
+    dim_t kernel_width = _kernels.shape[3];
 
-    //If _out is correctly allocated
-    if(
-        this->_forward_out.shape._shapes != std::array<std::size_t,TENSOR_MAX_DIM>({batch_dim,c_out,out_h,out_w})
-    ){
-        this->_forward_out.resize(Shape(out_shape));
-    }
+    dim_t N = in.shape[0];
+    dim_t H = in.shape[2];
+    dim_t W = in.shape[3];
+    dim_t H_out = (H + 2 * padding[0] - kernel_height) / strides[0] + 1;
+    dim_t W_out = (W + 2 * padding[1] - kernel_width) / strides[1] + 1;
 
-    TensorMath::conv2D(
-        input,
-        kernels,
-        _forward_out,
-        strides,
-        padding
+    __check_initialization(
+        this->_forward_col_input,
+        Shape({channels*kernel_height*kernel_width,N*H_out*W_out})
+    );
+    //First, transform the input
+    TensorMath::im2col2D(
+        in,
+        {kernel_height,kernel_width},
+        this->strides,
+        this->padding,
+        *(this->_forward_col_input)
     );
 
-
+    //Reshape the kernels
+    this->_kernels.reshape({features,channels*kernel_height*kernel_width});
+    //Multiply
+    __check_initialization(this->_forward_out,Shape({features,N*H_out*W_out}));
+    TensorMath::matmul(
+        this->_kernels,
+        *(this->_forward_col_input),
+        *(this->_forward_out)
+    );
+    //Return the original shape of the kernels
+    this->_kernels.reshape({features,channels,kernel_height,kernel_width});
+    //Reshape the output
+    this->_forward_out->reshape({features,N,H_out,W_out});
+    this->_forward_out->shape.transpose(0,1);
     return _forward_out;
 }
 
-void Conv2D::update_weights(Tensor& input){
+std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Tensor& forward_in){
+    assert(this->_forward_col_input.get() != nullptr);
+    using dim_t = std::size_t;
+    dim_t features = this->_kernels.shape[0];
+    dim_t channels = this->_kernels.shape[1];
+    dim_t k_height = this->_kernels.shape[2];
+    dim_t k_width = this->_kernels.shape[3];    
+
+    __check_initialization(this->_grad,Shape({features,channels*k_height*k_width}));
+    __check_initialization(this->_backward_out,forward_in.shape);
+    //Create a temporal copy of the backward_grad
+    Tensor _backward_grad_copy = Tensor(backward_grad,backward_grad.getDevice());
+    _backward_grad_copy.reshape({
+        backward_grad.shape[1],
+        backward_grad.shape[0] * backward_grad.shape[2] * backward_grad.shape[3]
+    });
+    //Compute kernel grad
     
-    TensorMath::add(kernels,input,kernels);
+    this->_forward_col_input->shape.transpose();
+    TensorMath::matmul(
+        _backward_grad_copy,
+        *(this->_forward_col_input),
+        *(this->_grad)
+    );
+    this->_grad->reshape({features,channels,k_height,k_width});
+    //Compute kernel to propagate backwards. First, flatten the kernel
+    this->_kernels.reshape({features,channels*k_height*k_width});
+    this->_kernels.shape.transpose();
+
+    TensorMath::matmul(
+        this->_kernels,
+        _backward_grad_copy,
+        *(this->_forward_col_input)     //Warning : use of _forward_col_input as a buffer
+    );
+
+    TensorMath::col2im2D(
+        *(this->_forward_col_input),
+        {k_height,k_width},
+        this->strides,
+        this->padding,
+        *(this->_backward_out)
+    );
+    return this->_backward_out;
 }
+
+
+void Conv2D::update_weight(){
+    assert(this->_grad.get() != nullptr);
+    TensorMath::add(
+        this->_kernels,
+        *(this->_grad),
+        this->_kernels
+    );
+}   

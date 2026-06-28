@@ -103,14 +103,13 @@ void Shape::inner_pad(std::size_t dim){
     if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
     if( dim == n_dim){ return; }
     std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
+    std::fill(new_shapes.begin(),new_shapes.end(),1);
     std::size_t i = 0;  
     std::size_t j = 0;
     while( i < dim && j < this->n_dim){
         new_shapes[i++] = this->_shapes[j++];
     }
-    while(i < dim ){
-        new_shapes[j++] = 1;
-    }
+    this->_shapes = new_shapes;
     _trigger_shape_recomposition();
 }
 
@@ -121,26 +120,27 @@ void Shape::outer_pad(std::size_t dim){
     if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
     if( dim == n_dim){ return; }
     std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
+    std::fill(new_shapes.begin(),new_shapes.begin()+dim,1);
     std::size_t i = dim;  
     std::size_t j = this->n_dim;
     while( i --> 0 && j --> 0){
         new_shapes[i] = this->_shapes[j];
     }
-    while(i --> 0 ){
-        new_shapes[i] = 1;
-    }
+    this->_shapes = new_shapes;
     _trigger_shape_recomposition();
 }
 
 /*
     @brief Broadcast two shapes. If their dimensionality don't match, expands them outerly
 */
-void Shape::broadcast_shapes(Shape& a, Shape& b){
+void Shape::broadcast_shapes(Shape& a, Shape& b, std::size_t ignore){
     auto n_dim = std::max(a.n_dim,b.n_dim);
+    if( n_dim < ignore ) throw std::runtime_error("Error: Impossible to broadcast");
+    if( n_dim == ignore ){ return; } //Nothing to broadcast
     a.outer_pad(n_dim);
     b.outer_pad(n_dim);
 
-    for(size_t  i = n_dim; i --> 0;){
+    for(size_t  i = n_dim - ignore; i --> 0;){
         if( a[i] == 1 || b[i] == 1 ){
             if( a[i] == b[i] ){ continue; } //Do no touch strides, shapes are already equal
             std::size_t max_shape = std::max(a[i],b[i]);

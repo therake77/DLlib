@@ -9,11 +9,28 @@ namespace TensorMath {
     void divide(const Tensor& a, const Tensor&b, Tensor& out);
     void sqrt(const Tensor& a, Tensor& out);
     void pow(const Tensor& a, const int i, Tensor& out);
+    void log(const Tensor& a, Tensor& out);
+    
 
     void matmul(const Tensor& a, const Tensor&b, Tensor& out);
     void conv2D(const Tensor& in, const Tensor& ker, Tensor& out, size_t stride, size_t padding);
     void conv2D(const Tensor& in, const Tensor& ker, Tensor& out, std::array<size_t,2> stride, std::array<size_t,2> padding);
     
+    void im2col2D(
+        const Tensor& in, 
+        std::array<std::size_t,2> window_shape,
+        std::array<std::size_t,2> strides,
+        std::array<std::size_t,2> padding,
+        Tensor& out
+    );
+
+    void col2im2D(
+        const Tensor& in, 
+        std::array<std::size_t,2> window_shape,
+        std::array<std::size_t,2> strides,
+        std::array<std::size_t,2> padding,
+        Tensor& out
+    );
 
     void reLU(const Tensor& a, Tensor& out);
     void sigmoid(const Tensor& a, Tensor& out);

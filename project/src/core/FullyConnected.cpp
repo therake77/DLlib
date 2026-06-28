@@ -11,7 +11,7 @@
 FullyConnected::FullyConnected(
     std::array<size_t, TENSOR_MAX_DIM> shape,
     std::shared_ptr<Device> dev
-) : _weights(shape,dev),_bias({1,shape[0]},dev), Layer(dev) {
+) : _weights(shape,dev),_bias({1,shape[1]},dev), Layer(dev) {
     if(Shape(shape).n_dim != 2){ throw std::runtime_error("Error: Only valid 2-dimensional shapes"); }
     this->input_dim = shape[0];
     this->output_dim = shape[1];
@@ -47,7 +47,23 @@ std::shared_ptr<Tensor> FullyConnected::backward(const Tensor& backward_grad, co
         backward_grad,
         *(this->_grad)
     );
-    //Compute (TODO)
+    //Compute beta gradient
+    TensorMath::reduce_all(
+        backward_grad,
+        *(this->_bias_grad),
+        0
+    );
+    this->_bias_grad->outer_expand(1);  
+
+    //Compute output gradient
+    this->_weights.shape.transpose();
+    TensorMath::matmul(
+        backward_grad,
+        this->_weights,
+        *(this->_backward_out)
+    );
+    this->_weights.shape.transpose();
+    return this->_backward_out;
 }
 
 

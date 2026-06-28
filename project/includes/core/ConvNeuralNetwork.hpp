@@ -3,11 +3,11 @@
 
 class ConvolutionalNeuralNetwork{
 private:
-    std::vector<Layer> nn_layers;
+    std::vector<std::unique_ptr<Layer>> nn_layers;
 
 public:
     ConvolutionalNeuralNetwork(
-        std::vector<Layer> layers
+        std::vector<std::unique_ptr<Layer>>&& layers
     );
 
     std::shared_ptr<Tensor> forward( const Tensor& );

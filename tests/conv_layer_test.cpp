@@ -42,12 +42,12 @@ inline void fancy_print(const Tensor& a){
 int main(){
     auto device = DeviceManager::get_cpu_device();
     Tensor input = Tensor(
-        {1,3,10,10},device
+        {1,3,10,10},device, 1.0f, true
     );
     fancy_print(input);
-    Conv2D layer = Conv2D( {1,3,3,3},device,{0,0},{1,1} );
-    fancy_print(layer.kernels);
-    Tensor output = layer.forward(input);
-    fancy_print(output);
+    Conv2D layer = Conv2D( {5,3,3,3},device,{0,0},{1,1} );
+    auto result = layer.forward(input);
+    if( result.get() == nullptr ){ throw std::runtime_error("Fatal: no output returned"); }
+    fancy_print(*(result));
 
 }

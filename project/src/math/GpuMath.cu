@@ -25,6 +25,10 @@ void GpuMath::pow(const float* a,  Shape a_shape, int _n, float* out, Shape out_
 
 }
 
+void GpuMath::log(const float* a,  Shape a_shape, float* out, Shape out_shape){
+
+}
+
 
     //Linear Algebra
 void GpuMath::matmul(
@@ -44,6 +48,26 @@ void GpuMath::conv2D(
 
 }
 
+void GpuMath::im2col2d(
+    const float* in, Shape in_shape,
+    float* out, Shape out_shape,
+    std::array<std::size_t,2> window_shape,
+    std::array<std::size_t,2> strides,
+    std::array<std::size_t,2> padding
+){
+
+}
+
+void GpuMath::col2im2d(
+    const float* in, Shape in_shape,
+    float* out, Shape out_shape,
+    std::array<std::size_t,2> window_shape,
+    std::array<std::size_t,2> strides,
+    std::array<std::size_t,2> padding
+){
+
+}
+
 //Activation functions
 void GpuMath::reLU(
     const float* a, float* out, size_t n_elements
@@ -57,7 +81,12 @@ void GpuMath::sigmoid(const float* a, float* out, size_t n_elements) {
 void GpuMath::tanh(const float* a, float* out, size_t n_elements) {
 
 }
-void GpuMath::softmax(const float* a, float* out, size_t n_elements) {
+void GpuMath::softmax(
+    const float* a,
+    Shape a_shape, 
+    float* out,
+    Shape out_shape
+) {
 
 }
     
