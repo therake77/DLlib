@@ -2,6 +2,7 @@
 
 class MaxPooling : virtual public Layer{
 private:
+    std::unique_ptr<Tensor> _mask;
     std::array<std::size_t, 2> window_shape;
     std::array<std::size_t, 2> stride;
     std::array<std::size_t, 2> padding;
@@ -11,11 +12,13 @@ public:
     MaxPooling(
         std::array<std::size_t, 2> _window_shape,
         std::array<std::size_t, 2> _stride,
-        std::array<std::size_t, 2> _padding
-    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+        std::array<std::size_t, 2> _padding,
+        std::shared_ptr<Device> dev
+    );
 
-    Tensor forward(Tensor&) override;
-    void update_weights(Tensor&) override;
+    std::shared_ptr<Tensor> forward( const Tensor& ) override;
+    std::shared_ptr<Tensor> backward( const Tensor&, const Tensor& ) override;
+    void update_weight() override;
 };  
 
 class AvgPooling : public Layer{
@@ -30,8 +33,9 @@ public:
         std::array<std::size_t, 2> _window_shape,
         std::array<std::size_t, 2> _stride,
         std::array<std::size_t, 2> _padding
-    ) : window_shape(_window_shape),stride(_stride),padding(_padding){}
+    );
 
-    Tensor forward(Tensor&) override;
-    void update_weights(Tensor&) override;
+    std::shared_ptr<Tensor> forward( const Tensor& ) override;
+    std::shared_ptr<Tensor> backward( const Tensor&, const Tensor&  ) override;
+    void update_weight() override;
 };

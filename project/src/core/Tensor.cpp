@@ -34,7 +34,7 @@ Tensor::Tensor(
 }
 
 
-Tensor::Tensor(Tensor& t, std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
+Tensor::Tensor(const Tensor& t, const std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
 
     void* data_ptr = this->device->allocate(shape.n_elements * sizeof(float));
     if(data_ptr == nullptr){
@@ -114,4 +114,126 @@ void Tensor::to(std::shared_ptr<Device> device){
         this->cpu_data.reset();
     }
     this->device = device;
+}
+
+//TODO(Check correct management of memory)
+void Tensor::resize(Shape s){
+    //Checking if the number of elements remains the same (just a reshape)
+    if(s.n_elements == this->shape.n_elements){
+        this->shape = s;
+    }
+
+    //Not a simple reshape: Allocate fresh memory and copy the current data to the new pointer
+    void* new_ptr = this->device->allocate(s.n_elements * sizeof(float));
+
+    auto currDev = this->device;
+    auto deleter =  [currDev](void* p){
+        currDev->free(p);
+    };
+
+    this->device->copy_device_to_device(new_ptr,this->data(),this->shape.n_elements);
+
+    //Drop the old data, assign new unique_ptr to the corresponding data
+    switch(device->get_type()){
+        case(DeviceType::CPU) : {
+            this->cpu_data.reset();
+            this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
+                new_ptr,
+                deleter
+            );
+        }
+        case(DeviceType::GPU) : {
+            this->gpu_data.reset();
+            this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
+                new_ptr,
+                deleter
+            );
+        }
+    }
+}
+
+void Tensor::reshape(std::array<std::size_t, TENSOR_MAX_DIM> new_shape) {
+    Shape s = Shape(new_shape);
+    if(s.n_elements != this->shape.n_elements){
+        throw std::runtime_error("Error: Impossible to reshape");
+    }else{
+        this->shape = s;
+    }
+    return;
+}
+
+void Tensor::copy_from(const Tensor& t){
+    if(this->device->get_type() != t.device->get_type()){
+        throw std::runtime_error("Error: Different devices not allowed");
+    }
+    if( this->shape.n_elements != t.shape.n_elements){
+        throw std::runtime_error("Error: Dangerous copy");
+    }
+
+    std::size_t total_bytes = this->shape.n_elements * sizeof(float);
+    auto dev = this->device;
+    switch(dev->get_type()){
+        case DeviceType::CPU:
+            dev->copy_device_to_device(
+                this->cpu_data.get(),
+                t.cpu_data.get(),
+                total_bytes
+            );
+            break;
+        case DeviceType::GPU:
+            dev->copy_device_to_device(
+                this->gpu_data.get(),
+                t.gpu_data.get(),
+                total_bytes
+            );
+            break;
+        default:
+            throw std::runtime_error("Device not recognized");
+            break;
+    }
+
+}
+
+void Tensor::zeros(){
+    auto device = this->device;
+    switch(this->device->get_type()){
+        case DeviceType::CPU:
+            device->memset(
+                this->cpu_data.get(),
+                0.0f,
+                this->shape.n_elements
+            );
+            break;
+        case DeviceType::GPU:
+            device->memset(
+                this->gpu_data.get(),
+                0.0f,
+                this->shape.n_elements
+            );
+            break;
+        default:
+            throw std::runtime_error("Error: Unexpected device type ");
+            break;
+    }
+}
+
+Tensor& Tensor::unsqueeze(std::size_t axis){
+    this->shape = this->shape.unsqueeze(axis);
+    return *this;
+}
+
+void Tensor::inner_expand(std::size_t dims){
+    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
+    this->shape.inner_pad(dims);
+    return;
+}
+
+void Tensor::outer_expand(std::size_t dims){
+    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
+    this->shape.outer_pad(dims);
+    return;
+}
+
+void Tensor::contiguous(){
+    
 }
