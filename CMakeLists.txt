@@ -33,6 +33,9 @@ set(SRC_FILES
     project/src/core/Tensor.cpp
     project/src/core/Shape.cpp
     project/src/core/ConvNeuralNetwork.cpp
+    project/src/data/stb_image.cpp
+    project/src/data/ImageLoader.cpp
+    project/src/data/Dataset.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
@@ -46,7 +49,7 @@ endif()
 
 add_library(cnn_lib STATIC ${SRC_FILES})
 
-target_include_directories(cnn_lib PUBLIC include)
+target_include_directories(cnn_lib PUBLIC project/includes)
 
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
@@ -62,6 +65,9 @@ target_link_libraries(pooling_test PRIVATE cnn_lib)
 
 add_executable(cnn_test tests/cnn_test.cpp)
 target_link_libraries(cnn_test PRIVATE cnn_lib)
+
+add_executable(dataset_test tests/dataset_test.cpp)
+target_link_libraries(dataset_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
