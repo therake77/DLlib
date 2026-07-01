@@ -39,21 +39,23 @@ std::shared_ptr<Tensor> FullyConnected::backward(const Tensor& backward_grad, co
     assert(backward_grad.shape.n_dim == 2);
     __check_initialization(this->_bias_grad,Shape({this->output_dim}));
     __check_initialization(this->_grad,this->_weights.shape);
-    //Transpose _forward_out
-    this->_forward_out->shape.transpose();
+    __check_initialization(this->_backward_out,Shape({forward_input.shape[0],this->input_dim}));
+    //Copy the original input
+    Tensor forward_input_copy = Tensor(forward_input,this->_dev);
+    forward_input_copy.shape.transpose();
     //Compute weight gradient
     TensorMath::matmul(
-        *(this->_forward_out),
+        forward_input_copy,
         backward_grad,
         *(this->_grad)
     );
+    this->_bias_grad->reshape({this->output_dim});
     //Compute beta gradient
-    TensorMath::reduce_all(
+    TensorMath::sum(
         backward_grad,
-        *(this->_bias_grad),
-        0
+        0,
+        *(this->_bias_grad)
     );
-    this->_bias_grad->outer_expand(1);  
 
     //Compute output gradient
     this->_weights.shape.transpose();

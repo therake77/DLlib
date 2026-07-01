@@ -1,6 +1,7 @@
 #include <core/Tensor.hpp>
 #include <stdexcept>
 #include <cstring>
+
 /*Creates a tensor of shape (m,n,l,..,z,y,x) where `m` is the outermost dimension and `x` the innermost dimension. 
 An optional value to fill the tensor can be specified, defaults to 0.0f */
 Tensor::Tensor(
@@ -121,30 +122,27 @@ void Tensor::resize(Shape s){
     //Checking if the number of elements remains the same (just a reshape)
     if(s.n_elements == this->shape.n_elements){
         this->shape = s;
+        return;
     }
 
-    //Not a simple reshape: Allocate fresh memory and copy the current data to the new pointer
+    //Not a simple reshape: Allocate fresh memory
     void* new_ptr = this->device->allocate(s.n_elements * sizeof(float));
-
+    
     auto currDev = this->device;
     auto deleter =  [currDev](void* p){
         currDev->free(p);
     };
-
-    this->device->copy_device_to_device(new_ptr,this->data(),this->shape.n_elements);
-
+    currDev->memset(new_ptr,0.0f,s.n_elements);
     //Drop the old data, assign new unique_ptr to the corresponding data
     switch(device->get_type()){
         case(DeviceType::CPU) : {
-            this->cpu_data.reset();
             this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
                 new_ptr,
                 deleter
             );
         }
         case(DeviceType::GPU) : {
-            this->gpu_data.reset();
-            this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(
+            this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(
                 new_ptr,
                 deleter
             );
@@ -223,17 +221,52 @@ Tensor& Tensor::unsqueeze(std::size_t axis){
 }
 
 void Tensor::inner_expand(std::size_t dims){
-    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
     this->shape.inner_pad(dims);
     return;
 }
 
 void Tensor::outer_expand(std::size_t dims){
-    if( dims > this->shape.n_dim ){ throw std::runtime_error("Warning: contraction detected. Stopping"); }
     this->shape.outer_pad(dims);
     return;
 }
 
 void Tensor::contiguous(){
-    
+    auto curr_dev = this->device;
+    if(this->shape.is_contiguous()){
+        return;
+    }else{
+        std::vector<std::size_t> shapes(this->shape._shapes.begin(),this->shape._shapes.begin()+this->shape.n_dim);
+        std::vector<std::size_t> strides(this->shape._strides.begin(),this->shape._strides.begin()+this->shape.n_dim);
+        void* new_data_ptr = this->device->allocate(this->shape.n_elements * sizeof(float));
+        auto deleter = [curr_dev](void* ptr){
+            curr_dev->free(ptr);
+        };
+        
+        switch(this->device->get_type()){
+            case DeviceType::CPU:
+                this->device->make_contiguous(
+                    new_data_ptr,
+                    this->cpu_data.get(),
+                    shapes,
+                    strides
+                );
+                this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(
+                    new_data_ptr,deleter
+                );
+                break;
+            case DeviceType::GPU:
+                this->device->make_contiguous(
+                    new_data_ptr,
+                    this->gpu_data.get(),
+                    shapes,
+                    strides
+                );
+                this->gpu_data = std::unique_ptr<void,std::function<void(void*)>>(
+                    new_data_ptr,deleter
+                );
+                break;
+            default:
+                break;
+        }
+    }
 }

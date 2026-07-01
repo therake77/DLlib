@@ -61,6 +61,7 @@ Conv2D::Conv2D(
     //Reshape the output
     this->_forward_out->reshape({features,N,H_out,W_out});
     this->_forward_out->shape.transpose(0,1);
+    this->_forward_out->contiguous();
     return _forward_out;
 }
 
@@ -76,6 +77,7 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
     __check_initialization(this->_backward_out,forward_in.shape);
     //Create a temporal copy of the backward_grad
     Tensor _backward_grad_copy = Tensor(backward_grad,backward_grad.getDevice());
+    _backward_grad_copy.shape.transpose(0,1);
     _backward_grad_copy.reshape({
         backward_grad.shape[1],
         backward_grad.shape[0] * backward_grad.shape[2] * backward_grad.shape[3]
@@ -92,12 +94,16 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
     //Compute kernel to propagate backwards. First, flatten the kernel
     this->_kernels.reshape({features,channels*k_height*k_width});
     this->_kernels.shape.transpose();
-
+    this->_forward_col_input->shape.transpose();
     TensorMath::matmul(
         this->_kernels,
         _backward_grad_copy,
         *(this->_forward_col_input)     //Warning : use of _forward_col_input as a buffer
     );
+
+    //Put back again the kernels to their original shapes
+    this->_kernels.shape.transpose();
+    this->_kernels.reshape({features,channels,k_height,k_width});
 
     TensorMath::col2im2D(
         *(this->_forward_col_input),

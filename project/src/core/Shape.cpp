@@ -5,7 +5,7 @@
 Shape::Shape(std::array<size_t,TENSOR_MAX_DIM> arr) : _shapes(arr),_strides({0}) {
     
     size_t index = TENSOR_MAX_DIM - 1;
-    while(arr[index] == 0){ index--; }
+    while(index < TENSOR_MAX_DIM && arr[index] == 0){ index--; }
     if(index >= TENSOR_MAX_DIM ) { throw std::runtime_error("Error: Tensor with zero dimensions not allowed"); }
     
     size_t _n_dims = index + 1;
@@ -103,7 +103,7 @@ void Shape::inner_pad(std::size_t dim){
     if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
     if( dim == n_dim){ return; }
     std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
-    std::fill(new_shapes.begin(),new_shapes.end(),1);
+    std::fill(new_shapes.begin(),new_shapes.begin()+dim,1);
     std::size_t i = 0;  
     std::size_t j = 0;
     while( i < dim && j < this->n_dim){
@@ -128,6 +128,17 @@ void Shape::outer_pad(std::size_t dim){
     }
     this->_shapes = new_shapes;
     _trigger_shape_recomposition();
+}
+
+bool Shape::is_contiguous(){
+    //I'm bored, i'm going to take advantage of the Shape constructor and its ability
+    //of computing strides
+    Shape as_it_should_be = Shape(this->_shapes);
+    if(as_it_should_be._strides == this->_strides){
+        return true;
+    }else{
+        return false;
+    }
 }
 
 /*

@@ -272,17 +272,9 @@ void TensorMath::matmul(const Tensor& a, const Tensor&b , Tensor& out){
 
     Shape _expanded_a = a.shape;
     Shape _expanded_b = b.shape;
-    Shape::broadcast_shapes(_expanded_a,_expanded_b,2);
+    Shape::broadcast_shapes(_expanded_a,_expanded_b,2); //Ignore last two (innermost) dimension
     Shape _virtual_expanded_out = out.shape;
     _virtual_expanded_out.outer_pad(std::max(a.shape.n_dim,b.shape.n_dim));
-/*
-    Shape _expanded_a = _expand_shape_no_strides(a.shape);
-    Shape _expanded_b = _expand_shape_no_strides(b.shape);
-    _input_broadcast(_expanded_a,_expanded_b);
-    
-    Shape _virtual_expanded_out = _expand_shape_with_strides(out.shape);
-    _check_matmul_shapes(_expanded_a,_expanded_b,_virtual_expanded_out);
-*/
 
     device->math->matmul(
         a.data(),_expanded_a,
@@ -406,7 +398,7 @@ void TensorMath::col2im2D(
     }
 
     auto device = in.getDevice();
-    device->math->im2col2d(
+    device->math->col2im2d(
         in.data(),
         in.shape,
         out.data(),
@@ -475,10 +467,13 @@ void TensorMath::sum(const Tensor& a, std::size_t axis, Tensor& out){
     _ensure_same_device(a,out);
     Shape a_shape_copy = a.shape;
     Shape out_shape_copy = out.shape;
-    out_shape_copy.unsqueeze(axis);
+    if(a.shape.n_dim - 1== out.shape.n_dim){
+        out_shape_copy = out_shape_copy.unsqueeze(axis);
+    }
     Shape::broadcast_shapes(a_shape_copy,out_shape_copy);
     _ensure_same_shape(a_shape_copy,out_shape_copy);
-
+    //Because of traumas, explicitly zero the axis stride on out
+    out_shape_copy._strides[axis] = 0;
     auto dev = a.getDevice();
     dev->math->sum(
         a.data(),
@@ -601,8 +596,8 @@ void TensorMath::avg_pooling2d(
     //Ensure in and out shapes follows the rules of max_pooling
     if( in.shape[0] != out.shape[0] || in.shape[1] != out.shape[1] ) { throw std::runtime_error("Error: Unexpected shape"); }
     if( 
-        in.shape[2] != (out.shape[2] + 2*padding[0] - window_shapes[0])/strides[0] + 1 ||
-        in.shape[3] != (out.shape[3] + 2*padding[1] - window_shapes[1])/strides[1] + 1 
+        out.shape[2] != (in.shape[2] + 2*padding[0] - window_shapes[0])/strides[0] + 1 ||
+        out.shape[3] != (in.shape[3] + 2*padding[1] - window_shapes[1])/strides[1] + 1 
     ){
         throw std::runtime_error("Error: Unexpected shape");
     }

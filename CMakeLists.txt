@@ -47,6 +47,8 @@ endif()
 add_library(cnn_lib STATIC ${SRC_FILES})
 
 target_include_directories(cnn_lib PUBLIC include)
+target_link_libraries(cnn_lib PRIVATE CUDA::curand)
+
 
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
