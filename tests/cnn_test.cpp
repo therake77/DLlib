@@ -52,7 +52,7 @@ int main(){
         {1,1}
     );
     BatchNorm batch_layer = BatchNorm(
-        1,device
+        2,device
     );
     MaxPooling max_pool_layer = MaxPooling(
         {2,2},
@@ -140,6 +140,25 @@ int main(){
         true
     );
     
-    //Feed it to the 
-
+    //Feed it to the last layer
+    auto backward_grad1 = out.backward(label,*result8);
+    std::cout<<"backward_grad1 passed\n";
+    auto backward_grad2 = dense2.backward(*backward_grad1,*result7);
+    std::cout<<"backward_grad2 passed\n";
+    auto backward_grad3 = activation2.backward(*backward_grad2,*result6);
+    std::cout<<"backward_grad3 passed\n";
+    auto backward_grad4 = dense1.backward(*backward_grad3,*result5);
+    std::cout<<"backward_grad4 passed\n";
+    auto backward_grad5 = activation.backward(*backward_grad4,*result4);
+    std::cout<<"backward_grad5 passed\n";
+    auto backward_grad6 = flatten_layer.backward(*backward_grad5,*result3);
+    std::cout<<"backward_grad6 passed\n";
+    auto backward_grad7 = max_pool_layer.backward(*backward_grad6,*result2);
+    std::cout<<"backward_grad7 passed\n";
+    auto backward_grad8 = batch_layer.backward(*backward_grad7,*result1);
+    std::cout<<"backward_grad8 passed\n";
+    auto backward_grad9 = conv_layer.backward(*backward_grad8,input);
+    fancy_print(
+        *backward_grad9
+    );
 }

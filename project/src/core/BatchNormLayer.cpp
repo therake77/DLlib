@@ -213,10 +213,10 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     expanded_grad_gamma.unsqueeze(0),
     expanded_sqrt_variances.unsqueeze(0);
     expanded_gamma.unsqueeze(0);
-    expanded_grad_beta.inner_expand(n_dim-2);
-    expanded_grad_gamma.inner_expand(n_dim-2),
-    expanded_sqrt_variances.inner_expand(n_dim-2);
-    expanded_gamma.inner_expand(n_dim-2);
+    expanded_grad_beta.inner_expand(n_dim);
+    expanded_grad_gamma.inner_expand(n_dim),
+    expanded_sqrt_variances.inner_expand(n_dim);
+    expanded_gamma.inner_expand(n_dim);
 
     //Now that all are well expanded, compute (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
     //In two steps. First M . dL/dY . dL/d\beta saved in _backward_out, and then X_normalized . dL/d\gamma saved in X_normalized

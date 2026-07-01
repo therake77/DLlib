@@ -53,13 +53,21 @@ void MaxPooling::update_weight(){
     return;
 }
 
+AvgPooling::AvgPooling(
+    std::array<std::size_t, 2> _window_shape,
+    std::array<std::size_t, 2> _stride,
+    std::array<std::size_t, 2> _padding,
+    std::shared_ptr<Device> dev
+) : Layer(dev), window_shape(_window_shape), stride(_stride), padding(_padding) {}
+
+
 std::shared_ptr<Tensor> AvgPooling::forward(const Tensor& in){
     
     //Dimension shapes
     std::size_t batch_dim = in.shape[0];
     std::size_t channel_dim = in.shape[1];
-    std::size_t out_h = (in.shape[2] - this->window_shape[0] + 2 * padding[0])/stride[0] + 1;
-    std::size_t out_w = (in.shape[3] - this->window_shape[1] + 2 * padding[1])/stride[1] + 1;
+    std::size_t out_h = (in.shape[2] + 2 * padding[0] - this->window_shape[0])/stride[0] + 1;
+    std::size_t out_w = (in.shape[3] + 2 * padding[1] - this->window_shape[1])/stride[1] + 1;
     //Check initializations
     __check_initialization(this->_forward_out, Shape({batch_dim,channel_dim,out_h,out_w}));
     //Call max_pooling

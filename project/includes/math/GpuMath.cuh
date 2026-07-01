@@ -1,5 +1,9 @@
 #include <math/Math.hpp>
 
+constexpr std::size_t THREADS_PER_BLOCK = 256;
+constexpr std::size_t TILE_SIZE = 16;
+
+
 class GpuMath : public Math{
 public:
 

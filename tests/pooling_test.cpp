@@ -45,19 +45,19 @@ int main(){
     
 
     MaxPooling max_pool = MaxPooling(
-        {2,2},{1,1},{0,0}
+        {2,2},{1,1},{0,0},device
     );
 
     AvgPooling avg_pool = AvgPooling(
-        {2,2},{1,1},{0,0}
+        {2,2},{1,1},{0,0},device
     );
 
-    Tensor output1 = max_pool.forward(input);
-    Tensor output2 = avg_pool.forward(input);
+    auto output1 = max_pool.forward(input);
+    auto output2 = avg_pool.forward(input);
     fancy_print(input);
 
-    fancy_print(output1);
-    fancy_print(output2);
+    fancy_print(*output1);
+    fancy_print(*output2);
 
     return 0;
 }
