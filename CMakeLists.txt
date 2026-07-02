@@ -69,6 +69,9 @@ target_link_libraries(cnn_test PRIVATE cnn_lib)
 add_executable(dataset_test tests/dataset_test.cpp)
 target_link_libraries(dataset_test PRIVATE cnn_lib)
 
+add_executable(dataset_real_test tests/dataset_real_test.cpp)
+target_link_libraries(dataset_real_test PRIVATE cnn_lib)
+
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
