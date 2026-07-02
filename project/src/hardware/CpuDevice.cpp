@@ -2,7 +2,36 @@
 #include <stdexcept>
 #include <cstring>
 #include <random>
+#include <cassert>
 
+namespace{
+    bool _increment_odometer(std::vector<size_t>& coords, std::vector<size_t>& shape){
+        for(size_t i = coords.size(); i --> 0 ;){
+            //guard against overflow
+            if(coords[i] == SIZE_MAX){ throw std::runtime_error("Error: Overflow detected"); }
+            //try incrementing it
+            coords[i]++;
+            //If the increment don't exceed the current dimension, then just break (returning true)
+            if(coords[i] < shape[i]){
+                return true;
+            }else{ //Else, go back the coordinate to zero
+                coords[i] = 0;
+            }
+            //And in the next loop, the next dimension would be incremented
+        }
+        //If the loop doesn't break and finishes, that means all coords are zero and the odometer has "overflowed". 
+        // There is no element next.
+        return false;
+    }
+
+    size_t _compute_idx_from_coords(std::vector<size_t> coords, std::vector<size_t>& strides ){
+        size_t offset = 0;
+        for(size_t i = 0; i < coords.size();i ++){
+            offset += (coords[i] * strides[i]);
+        }
+        return offset;
+    }
+};
 
 void* CpuDevice::allocate(size_t _n_bytes){
     return std::malloc(_n_bytes);
@@ -41,6 +70,41 @@ void CpuDevice::memset_rand(void* dst, size_t _n){
     for(size_t i = 0 ; i < _n; i++){
         f_dst[i] = dist(gen); 
     }
+}
+
+void CpuDevice::make_contiguous(
+    void* dst, 
+    const void* src, 
+    std::vector<std::size_t> shapes,
+    std::vector<std::size_t> faulty_strides
+){
+    assert(shapes.size() == faulty_strides.size());
+    std::size_t n_dim = shapes.size();
+    if(n_dim == 0){ return; }
+    std::vector<std::size_t> coords(n_dim,0);
+    //Compute correct strides
+    std::vector<std::size_t> dst_strides(n_dim,0);
+
+    float* dst_float = static_cast<float*>(dst);
+    const float* src_float = static_cast<const float*>(src);
+    
+    dst_strides[n_dim-1] = 1;    
+    for(size_t i = n_dim - 1; i --> 0; ){
+        dst_strides[i] =  shapes[i+1] * dst_strides[i+1];
+    }
+    //Copy data
+    do{
+        std::size_t dst_idx = _compute_idx_from_coords(
+            coords,
+            dst_strides
+        );
+        std::size_t src_idx = _compute_idx_from_coords(
+            coords,
+            faulty_strides
+        );
+
+        dst_float[dst_idx] = src_float[src_idx];
+    }while(_increment_odometer(coords,shapes));
 }
 
 DeviceType CpuDevice::get_type() const {

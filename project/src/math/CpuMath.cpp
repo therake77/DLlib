@@ -239,6 +239,7 @@ void CpuMath::multiply(
     const float* b, Shape b_shape, 
     float* out, Shape out_shape
 ) {
+    assert(a_shape == b_shape);
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -300,7 +301,7 @@ void CpuMath::matmul(
     std::vector<size_t> coords(max_dim-2,0);
     size_t count = 0;
 
-    while(count < total_batches){
+    do{
         /*Calculate slices*/
         const float* a_slice = a;
         const float* b_slice = b;
@@ -319,16 +320,7 @@ void CpuMath::matmul(
             stride_bk,stride_bn,
             stride_outm, stride_outn
         );
-        count++;
-        if(count == total_batches) break;
-
-        /*odometer*/
-        for(size_t i = max_dim - 2; i --> 0; ){
-            coords[i]++;
-            if(coords[i] < a_shape[i]) break; //a_shape[i] = b_shape[i] = out_shape[i] (because of broadcasting)
-            coords[i] = 0;
-        }
-    }
+    }while(_increment_odometer(coords,out_shape._shapes));
 
 }
 
@@ -470,7 +462,7 @@ void CpuMath::col2im2d(
     
     //Compute the original height and width of the output (as if it was a normal window-sliding operation)
     dim_t N = out_shape[0], C = out_shape[1], H = out_shape[2], W = out_shape[3];
-    dim_t rows = in_shape[0], cols = in_shape[1];
+    
     dim_t H_window = window_shape[0], W_window = window_shape[1];
     
     dim_t H_in = (H + 2 * padding[0] - H_window) / strides[0] + 1;
@@ -480,6 +472,7 @@ void CpuMath::col2im2d(
     //For each index in the output matrix
     do{
         //Compute what element in the input tensor corresponds to this index
+        dim_t rows = in_coords[0], cols = in_coords[1];
         dim_t delta_w = rows % W_window;
         dim_t delta_h = (rows/W_window) % H_window;
         dim_t c = rows / (H_window * W_window);
@@ -488,7 +481,7 @@ void CpuMath::col2im2d(
         dim_t n = cols / (H_in * W_in);
         dim_t h_out = h_in * strides[0] - padding[0] + delta_h;
         dim_t w_out = w_in * strides[1] - padding[1] + delta_w;
-        dim_t in_idx = _compute_idx_from_coords(in_coords,in_shape._shapes);
+        dim_t in_idx = _compute_idx_from_coords(in_coords,in_shape._strides);
         if( h_in < H || w_in < W){
             dim_t out_idx = _compute_idx_from_coords({n,c,h_out,w_out}, out_shape._strides);
             out[out_idx] += in[in_idx];

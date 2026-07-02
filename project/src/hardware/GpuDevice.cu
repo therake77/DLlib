@@ -2,11 +2,12 @@
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
+#include <chrono>
 
 #ifdef __USE_CUDA__
 #include <cuda.h>
 #include <cuda_runtime.h>
-
+#include <curand_kernel.h>
 
 void* GpuDevice::allocate(size_t _n_bytes){
     void* ptr;
@@ -52,14 +53,50 @@ void GpuDevice::memset(void* dst, float value, size_t size){
     }
 }
 
+namespace{
+    __global__ void rand_fill_kernel(
+        float* dst,
+        std::size_t n,
+        unsigned long long seed
+    ){
+        size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        if(idx >= n) return;
+        curandState state;
+        curand_init(seed,idx,0,&state);
+        dst[idx] = curand_uniform(&state);
+    }
+};
+
+
 /*Set `dst` memory region holding `_n` floats with a random float value from [0,1]. 
 `dst` is interpreted always as a float region of memory*/
 void GpuDevice::memset_rand(void* dst, size_t _n){
     float* f_dst = static_cast<float*>(dst);
-    /*Not implemented yet*/
-    throw std::logic_error("Not implemented");
+    constexpr std::size_t block_size = 256;
+    std::size_t grid_size = (_n + block_size - 1) / block_size;
+    unsigned long long seed = (unsigned long long)std::chrono::system_clock::now()
+                                .time_since_epoch().count();
+    rand_fill_kernel<<<grid_size,block_size>>>(
+        f_dst,
+        _n,
+        seed
+    );
+
+    auto result = cudaDeviceSynchronize();
+    if(result != cudaSuccess){
+        throw std::runtime_error("Error: Initializing memory with random values failed");
+    }
+    return;
 }
 
+void GpuDevice::make_contiguous(
+    void* dst, 
+    const void* src, 
+    const std::vector<std::size_t> shapes,
+    const std::vector<std::size_t> faulty_strides
+){
+
+}
 
 DeviceType GpuDevice::get_type() const {
     return DeviceType::GPU;
