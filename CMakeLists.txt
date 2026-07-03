@@ -36,6 +36,7 @@ set(SRC_FILES
     project/src/data/stb_image.cpp
     project/src/data/ImageLoader.cpp
     project/src/data/Dataset.cpp
+    project/src/data/DataLoader.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
@@ -70,6 +71,9 @@ target_link_libraries(cnn_test PRIVATE cnn_lib)
 
 add_executable(dataset_test tests/dataset_test.cpp)
 target_link_libraries(dataset_test PRIVATE cnn_lib)
+
+add_executable(dataloader_test tests/dataloader_test.cpp)
+target_link_libraries(dataloader_test PRIVATE cnn_lib)
 
 add_executable(dataset_real_test tests/dataset_real_test.cpp)
 target_link_libraries(dataset_real_test PRIVATE cnn_lib)
