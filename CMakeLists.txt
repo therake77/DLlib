@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.18)
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 project(llcnn VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -10,6 +15,7 @@ if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
     
     set(CMAKE_CUDA_ARCHITECTURES native)
     find_package(CUDAToolkit REQUIRED)
@@ -59,6 +65,9 @@ target_include_directories(cnn_lib PUBLIC include)
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(cnn_lib PUBLIC CUDA::curand CUDA::cuda_driver)
+    target_link_options(cnn_lib INTERFACE
+        $<$<CXX_COMPILER_ID:MSVC>:/NODEFAULTLIB:LIBCMT>
+    )
 endif()
 
 add_executable(tensor_test tests/tensor_test.cpp)
