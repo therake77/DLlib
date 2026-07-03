@@ -51,8 +51,10 @@ endif()
 add_library(cnn_lib STATIC ${SRC_FILES})
 
 target_include_directories(cnn_lib PUBLIC include)
-target_link_libraries(cnn_lib PRIVATE CUDA::curand)
 
+if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(cnn_lib PRIVATE CUDA::curand)
+endif()
 
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
@@ -79,6 +81,7 @@ add_executable(dataset_real_test tests/dataset_real_test.cpp)
 target_link_libraries(dataset_real_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
+    
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
