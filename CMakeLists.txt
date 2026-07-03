@@ -34,9 +34,13 @@ set(SRC_FILES
     project/src/core/Shape.cpp
     project/src/core/ConvNeuralNetwork.cpp
     project/src/data/stb_image.cpp
+    project/src/data/stb_image_resize.cpp
     project/src/data/ImageLoader.cpp
     project/src/data/Dataset.cpp
     project/src/data/DataLoader.cpp
+    project/src/data/transforms/Compose.cpp
+    project/src/data/transforms/Normalize.cpp
+    project/src/data/transforms/Resize.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
@@ -53,7 +57,7 @@ add_library(cnn_lib STATIC ${SRC_FILES})
 target_include_directories(cnn_lib PUBLIC include)
 
 if(CMAKE_CUDA_COMPILER)
-    target_link_libraries(cnn_lib PRIVATE CUDA::curand)
+    target_link_libraries(cnn_lib PUBLIC CUDA::curand CUDA::cuda_driver)
 endif()
 
 add_executable(tensor_test tests/tensor_test.cpp)
@@ -76,6 +80,15 @@ target_link_libraries(dataset_test PRIVATE cnn_lib)
 
 add_executable(dataloader_test tests/dataloader_test.cpp)
 target_link_libraries(dataloader_test PRIVATE cnn_lib)
+
+add_executable(dataset_transform_test tests/dataset_transform_test.cpp)
+target_link_libraries(dataset_transform_test PRIVATE cnn_lib)
+
+add_executable(resize_test tests/resize_test.cpp)
+target_link_libraries(resize_test PRIVATE cnn_lib)
+
+add_executable(normalize_test tests/normalize_test.cpp)
+target_link_libraries(normalize_test PRIVATE cnn_lib)
 
 add_executable(dataset_real_test tests/dataset_real_test.cpp)
 target_link_libraries(dataset_real_test PRIVATE cnn_lib)

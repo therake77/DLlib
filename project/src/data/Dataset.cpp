@@ -9,13 +9,15 @@ Dataset::Dataset(
     std::shared_ptr<Device> dev,
     bool grayscale,
     bool normalize,
-    bool recursive
+    bool recursive,
+    std::shared_ptr<Transform> transform
 )
     : _root(root),
       _dev(std::move(dev)),
       _grayscale(grayscale),
       _normalize(normalize),
       _recursive(recursive),
+      _transform(std::move(transform)),
       _loader(DeviceManager::get_cpu_device()) {
     if(!_dev) {
         throw std::runtime_error("Error: Invalid device");
@@ -121,11 +123,18 @@ Tensor Dataset::load_cpu(std::size_t index) const {
     if(index >= _samples.size()) {
         throw std::runtime_error("Error: Dataset index out of bounds");
     }
-    return _loader.load_image_cpu(
+
+    Tensor image = _loader.load_image_cpu(
         _samples[index].path,
         _grayscale,
         _normalize
     );
+
+    if(_transform) {
+        return _transform->apply(image);
+    }
+
+    return image;
 }
 
 Tensor Dataset::load(std::size_t index) const {

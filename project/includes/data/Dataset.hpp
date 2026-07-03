@@ -2,6 +2,7 @@
 
 #include <core/Tensor.hpp>
 #include <data/ImageLoader.hpp>
+#include <data/transforms/Transform.hpp>
 
 #include <cstddef>
 #include <filesystem>
@@ -22,7 +23,8 @@ public:
         std::shared_ptr<Device> dev = DeviceManager::get_cpu_device(),
         bool grayscale = false,
         bool normalize = true,
-        bool recursive = false
+        bool recursive = false,
+        std::shared_ptr<Transform> transform = nullptr
     );
 
     void reload();
@@ -66,6 +68,7 @@ private:
     bool _grayscale;
     bool _normalize;
     bool _recursive;
+    std::shared_ptr<Transform> _transform;
 
     ImageLoader _loader;
 
