@@ -38,6 +38,7 @@ set(SRC_FILES
     project/src/data/ImageLoader.cpp
     project/src/data/Dataset.cpp
     project/src/data/DataLoader.cpp
+    project/src/data/transforms/CenterCrop.cpp
     project/src/data/transforms/Compose.cpp
     project/src/data/transforms/Normalize.cpp
     project/src/data/transforms/Resize.cpp
@@ -90,8 +91,14 @@ target_link_libraries(resize_test PRIVATE cnn_lib)
 add_executable(normalize_test tests/normalize_test.cpp)
 target_link_libraries(normalize_test PRIVATE cnn_lib)
 
+add_executable(center_crop_test tests/center_crop_test.cpp)
+target_link_libraries(center_crop_test PRIVATE cnn_lib)
+
 add_executable(dataset_real_test tests/dataset_real_test.cpp)
 target_link_libraries(dataset_real_test PRIVATE cnn_lib)
+
+add_executable(dataset_real_transform_test tests/dataset_real_transform_test.cpp)
+target_link_libraries(dataset_real_transform_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
     

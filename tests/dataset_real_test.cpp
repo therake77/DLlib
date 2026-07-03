@@ -1,4 +1,9 @@
+#include <data/DataLoader.hpp>
 #include <data/Dataset.hpp>
+#include <data/transforms/CenterCrop.hpp>
+#include <data/transforms/Compose.hpp>
+#include <data/transforms/Normalize.hpp>
+#include <data/transforms/Resize.hpp>
 #include <hardware/DeviceManager.hpp>
 
 #include <algorithm>
@@ -6,6 +11,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -32,12 +38,24 @@ int main() {
             return 0;
         }
 
+        auto transform = std::make_shared<Compose>(
+            std::initializer_list<std::shared_ptr<Transform>>{
+                std::make_shared<Resize>(256, 256),
+                std::make_shared<CenterCrop>(224, 224),
+                std::make_shared<Normalize>(
+                    std::vector<float>{0.485f, 0.456f, 0.406f},
+                    std::vector<float>{0.229f, 0.224f, 0.225f}
+                )
+            }
+        );
+
         Dataset dataset(
             dataset_root,
             DeviceManager::get_cpu_device(),
             false,  // RGB
             true,   // normalize
-            true    // recursive
+            true,   // recursive
+            transform
         );
 
         require(
@@ -69,6 +87,9 @@ int main() {
             << '\n';
 
         std::cout
+            << "Transform: Resize(256, 256) -> CenterCrop(224, 224) -> Normalize(RGB)\n";
+
+        std::cout
             << "\nFirst classes:\n";
 
         std::size_t classes_to_print =
@@ -94,6 +115,13 @@ int main() {
 
         std::size_t images_to_check =
             dataset.size();
+
+        std::cout
+            << "\nChecking transformed images: "
+            << images_to_check
+            << " / "
+            << dataset.size()
+            << '\n';
 
         for(std::size_t i = 0; i < images_to_check; ++i) {
             const Dataset::Sample& sample =
@@ -127,7 +155,17 @@ int main() {
 
             require(
                 shape[1] == 3,
-                "Loaded real image should have 3 channels"
+                "Transformed real image should have 3 channels"
+            );
+
+            require(
+                shape[2] == 224,
+                "Transformed real image height should be 224"
+            );
+
+            require(
+                shape[3] == 224,
+                "Transformed real image width should be 224"
             );
 
             std::size_t height =
@@ -148,12 +186,12 @@ int main() {
                     << (i + 1)
                     << " / "
                     << images_to_check
-                    << " images\n";
+                    << " transformed images\n";
             }
         }
 
         std::cout
-            << "\nImage size statistics:\n";
+            << "\nTransformed image size statistics:\n";
 
         std::cout
             << "Minimum height x width: "
@@ -169,8 +207,64 @@ int main() {
             << max_width
             << '\n';
 
+        require(
+            dataset.size() >= 4,
+            "Real dataset should contain at least 4 images for DataLoader check"
+        );
+
+        DataLoader loader(
+            dataset,
+            4,
+            false,
+            false,
+            123
+        );
+
+        DataLoader::Batch batch =
+            loader.get_batch(0);
+
+        require(
+            batch.images.shape.n_dim == 4,
+            "Transformed real batch should be 4D"
+        );
+
+        require(
+            batch.images.shape[0] == 4,
+            "Transformed real batch size should be 4"
+        );
+
+        require(
+            batch.images.shape[1] == 3,
+            "Transformed real batch should have 3 channels"
+        );
+
+        require(
+            batch.images.shape[2] == 224,
+            "Transformed real batch height should be 224"
+        );
+
+        require(
+            batch.images.shape[3] == 224,
+            "Transformed real batch width should be 224"
+        );
+
+        require(
+            batch.labels.size() == 4,
+            "Transformed real batch labels size should be 4"
+        );
+
+        require(
+            batch.paths.size() == 4,
+            "Transformed real batch paths size should be 4"
+        );
+
+        require(
+            batch.class_names.size() == 4,
+            "Transformed real batch class names size should be 4"
+        );
+
         std::cout
-            << "\nReal dataset lazy-loading test passed"
+            << "\nReal dataset input pipeline test passed"
             << std::endl;
 
         return 0;

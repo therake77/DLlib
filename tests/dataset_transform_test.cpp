@@ -1,8 +1,12 @@
 #include <data/Dataset.hpp>
 #include <data/DataLoader.hpp>
+#include <data/transforms/CenterCrop.hpp>
+#include <data/transforms/Compose.hpp>
+#include <data/transforms/Normalize.hpp>
 #include <data/transforms/Resize.hpp>
 #include <hardware/DeviceManager.hpp>
 
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -16,6 +20,12 @@ namespace fs = std::filesystem;
 static void require(bool condition, const char* message) {
     if(!condition) {
         throw std::runtime_error(message);
+    }
+}
+
+static void check_close(float value, float expected, float eps = 1e-5f) {
+    if(std::fabs(value - expected) > eps) {
+        throw std::runtime_error("Unexpected transformed tensor value");
     }
 }
 
@@ -83,13 +93,24 @@ int main() {
 
         create_variable_size_dataset(root);
 
+        auto transform = std::make_shared<Compose>(
+            std::initializer_list<std::shared_ptr<Transform>>{
+                std::make_shared<Resize>(4, 4),
+                std::make_shared<CenterCrop>(2, 2),
+                std::make_shared<Normalize>(
+                    10.0f / 255.0f,
+                    10.0f / 255.0f
+                )
+            }
+        );
+
         Dataset dataset(
             root,
             DeviceManager::get_cpu_device(),
             true,
             true,
             false,
-            std::make_shared<Resize>(2, 2)
+            transform
         );
 
         require(
@@ -123,6 +144,12 @@ int main() {
             image.shape[3] == 2,
             "Transformed image width should be 2"
         );
+
+        const float* image_data = image.data();
+
+        for(std::size_t i = 0; i < image.shape.n_elements; ++i) {
+            check_close(image_data[i], 1.0f);
+        }
 
         DataLoader loader(
             dataset,
