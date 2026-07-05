@@ -44,6 +44,7 @@ set(SRC_FILES
     project/src/data/ImageLoader.cpp
     project/src/data/Dataset.cpp
     project/src/data/DataLoader.cpp
+    project/src/data/FlatDataset.cpp
     project/src/data/transforms/CenterCrop.cpp
     project/src/data/transforms/Compose.cpp
     project/src/data/transforms/Normalize.cpp
@@ -108,6 +109,9 @@ target_link_libraries(dataset_real_test PRIVATE cnn_lib)
 
 add_executable(dataset_real_transform_test tests/dataset_real_transform_test.cpp)
 target_link_libraries(dataset_real_transform_test PRIVATE cnn_lib)
+
+add_executable(flat_mnist_dataset_test tests/flat_mnist_dataset_test.cpp)
+target_link_libraries(flat_mnist_dataset_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
     
