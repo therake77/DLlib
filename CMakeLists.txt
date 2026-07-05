@@ -65,6 +65,13 @@ add_library(cnn_lib STATIC ${SRC_FILES})
 target_include_directories(cnn_lib PUBLIC include)
 
 if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(cnn_lib PRIVATE CUDA::curand)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options( cnn_lib PRIVATE
+            "$<$<COMPILE_LANGUAGE:CUDA>:-G>"      
+            "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>"
+        )
+    endif()
     target_link_libraries(cnn_lib PUBLIC CUDA::curand CUDA::cuda_driver)
     target_link_options(cnn_lib INTERFACE
         $<$<CXX_COMPILER_ID:MSVC>:/NODEFAULTLIB:LIBCMT>
@@ -85,6 +92,9 @@ target_link_libraries(pooling_test PRIVATE cnn_lib)
 
 add_executable(cnn_test tests/cnn_test.cpp)
 target_link_libraries(cnn_test PRIVATE cnn_lib)
+
+add_executable(kernel_test tests/kernel_tests.cpp)
+target_link_libraries(kernel_test PRIVATE cnn_lib)
 
 add_executable(dataset_test tests/dataset_test.cpp)
 target_link_libraries(dataset_test PRIVATE cnn_lib)
@@ -114,10 +124,10 @@ add_executable(flat_mnist_dataset_test tests/flat_mnist_dataset_test.cpp)
 target_link_libraries(flat_mnist_dataset_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
-    
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(conv_layer_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(pooling_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(cnn_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(kernel_test PRIVATE CUDA::cuda_driver)
 endif()

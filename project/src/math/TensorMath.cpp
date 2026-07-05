@@ -157,7 +157,7 @@ void TensorMath::sub(const Tensor& a, const Tensor&b, Tensor& out){
 
 void TensorMath::scale(const Tensor& a, float n, Tensor& out){
     _ensure_same_shape(a,out);
-    _ensure_same_device(a,out,DeviceType::CPU);
+    _ensure_same_device(a,out);
 
     auto device = a.getDevice();
     device->math->scale(
@@ -170,8 +170,8 @@ void TensorMath::scale(const Tensor& a, float n, Tensor& out){
 
 void TensorMath::multiply(const Tensor& a, const Tensor&b, Tensor& out){
     
-    _ensure_same_device(a,b,DeviceType::CPU);
-    _ensure_same_device(b,out,DeviceType::CPU);
+    _ensure_same_device(a,b);
+    _ensure_same_device(b,out);
 
     //Copy the shapes
     Shape a_shape = a.shape;
@@ -265,8 +265,8 @@ void TensorMath::log(const Tensor& a, Tensor& out){
 /*Matmul routine*/
 void TensorMath::matmul(const Tensor& a, const Tensor&b , Tensor& out){
     
-    _ensure_same_device(a,b,DeviceType::CPU);
-    _ensure_same_device(b,out,DeviceType::CPU);
+    _ensure_same_device(a,b);
+    _ensure_same_device(b,out);
 
     auto device = a.getDevice();
 
@@ -291,8 +291,8 @@ Expects 4D tensors. No exceptions allowed.
 */
 void TensorMath::conv2D(const Tensor& in, const Tensor& ker, Tensor& out, size_t stride, size_t padding){
     //Device guards
-    _ensure_same_device(in,ker,DeviceType::CPU);
-    _ensure_same_device(ker,out,DeviceType::CPU);
+    _ensure_same_device(in,ker);
+    _ensure_same_device(ker,out);
     //Ensure all tensors are EXACTLY 4D
     if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
     
@@ -311,8 +311,8 @@ void TensorMath::conv2D(const Tensor& in, const Tensor& ker, Tensor& out, size_t
 }
 
 void TensorMath::conv2D(const Tensor& in, const Tensor& ker, Tensor& out, std::array<size_t,2> stride, std::array<size_t,2> padding){
-    _ensure_same_device(in,ker,DeviceType::CPU);
-    _ensure_same_device(ker,out,DeviceType::CPU);
+    _ensure_same_device(in,ker);
+    _ensure_same_device(ker,out);
     //Ensure all tensors are EXACTLY 4D
     if(in.shape.n_dim != 4 || ker.shape.n_dim != 4 || out.shape.n_dim != 4){ throw std::runtime_error("Error: Tensors must be 4-dimensional"); }
     
