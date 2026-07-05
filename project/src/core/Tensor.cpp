@@ -163,6 +163,9 @@ void Tensor::resize(Shape s){
 
     //Not a simple reshape: Allocate fresh memory
     void* new_ptr = this->device->allocate(s.n_elements * sizeof(float));
+    if(new_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
     
     auto currDev = this->device;
     auto deleter =  [currDev](void* p){
@@ -176,14 +179,18 @@ void Tensor::resize(Shape s){
                 new_ptr,
                 deleter
             );
+            break;
         }
         case(DeviceType::GPU) : {
             this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(
                 new_ptr,
                 deleter
             );
+            break;
         }
     }
+
+    this->shape = s;
 }
 
 void Tensor::reshape(std::array<std::size_t, TENSOR_MAX_DIM> new_shape) {
@@ -226,6 +233,23 @@ void Tensor::copy_from(const Tensor& t){
             break;
     }
 
+}
+
+void Tensor::copy_from(const float* src, std::size_t count){
+    if(src == nullptr){
+        throw std::runtime_error("Error: Tensor source pointer is null");
+    }
+
+    if(count != this->shape.n_elements){
+        throw std::runtime_error("Error: Tensor pointer copy size mismatch");
+    }
+
+    std::size_t total_bytes = count * sizeof(float);
+    if(this->device->get_type() == DeviceType::CPU){
+        std::memcpy(this->cpu_data.get(), src, total_bytes);
+    }else{
+        this->device->copy_to_device(this->gpu_data.get(), src, total_bytes);
+    }
 }
 
 void Tensor::zeros(){

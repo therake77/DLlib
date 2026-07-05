@@ -97,7 +97,14 @@ int main() {
         require(train.width() == 28, "MNIST width should be 28");
         require(train.num_classes() == 10, "MNIST should contain 10 classes");
 
-        Tensor image = train.load_cpu(0);
+        Tensor image(
+            {1, 1, 28, 28},
+            DeviceManager::get_cpu_device(),
+            0.0f,
+            true
+        );
+        train.load_cpu(0, image);
+
         std::uint8_t label = train.label(0);
 
         std::cout
@@ -133,7 +140,21 @@ int main() {
             );
         }
 
-        Tensor batch = train.load_batch_cpu(0, 8);
+        float* reusable_image_ptr = image.data();
+        train.load_cpu(1, image);
+        require(
+            image.data() == reusable_image_ptr,
+            "Output-param single image should reuse memory when shape does not change"
+        );
+
+        Tensor batch(
+            {8, 1, 28, 28},
+            DeviceManager::get_cpu_device(),
+            0.0f,
+            true
+        );
+        train.load_batch_cpu(0, 8, batch);
+
         Tensor one_hot = train.labels_one_hot_cpu(0, 8);
 
         std::cout
@@ -166,6 +187,13 @@ int main() {
             batch.shape[2] == 28 &&
             batch.shape[3] == 28,
             "Flat MNIST batch should have shape (8, 1, 28, 28)"
+        );
+
+        float* reusable_batch_ptr = batch.data();
+        train.load_batch_cpu(8, 8, batch);
+        require(
+            batch.data() == reusable_batch_ptr,
+            "Output-param batch should reuse memory when shape does not change"
         );
 
         require(
