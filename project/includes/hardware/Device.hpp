@@ -47,7 +47,7 @@ public:
     */
     virtual void memset_rand(void*dst, size_t size) = 0;
 
-    virtual void memset_rand_normal_dist( void* dst, float mean, float std_dev, size_t _n );
+    virtual void memset_rand_normal_dist( void* dst, float mean, float std_dev, size_t _n ) = 0;
 
     virtual DeviceType get_type() const = 0;
     virtual std::string get_name() const = 0;

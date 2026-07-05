@@ -1,7 +1,7 @@
 #pragma once
 #include <core/Tensor.hpp>
 #include <iostream>
-void fancy_print(Tensor& a){
+inline void fancy_print(Tensor& a){
     const float* data = a.data();
     std::vector<size_t> coords(a.shape.n_dim,0);
     for(size_t i = 0; i < a.shape.n_dim; ++i){

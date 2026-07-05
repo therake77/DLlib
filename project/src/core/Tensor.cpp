@@ -1,6 +1,7 @@
 #include <core/Tensor.hpp>
 #include <stdexcept>
 #include <cstring>
+#include <iostream>
 
 /*Creates a tensor of shape (m,n,l,..,z,y,x) where `m` is the outermost dimension and `x` the innermost dimension. 
 An optional value to fill the tensor can be specified, defaults to 0.0f */
@@ -153,8 +154,9 @@ void Tensor::to(std::shared_ptr<Device> device){
 //TODO(Check correct management of memory)
 void Tensor::resize(Shape s){
     //Checking if the number of elements remains the same (just a reshape)
-    if(s.n_elements == this->shape.n_elements){
-        this->shape = s;
+    bool same_n_elements = s.n_elements == this->shape.n_elements;
+    this->shape = s;
+    if(same_n_elements){
         return;
     }
 
@@ -173,12 +175,14 @@ void Tensor::resize(Shape s){
                 new_ptr,
                 deleter
             );
+            break;
         }
         case(DeviceType::GPU) : {
             this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(
                 new_ptr,
                 deleter
             );
+            break;
         }
     }
 }

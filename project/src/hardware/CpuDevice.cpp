@@ -24,9 +24,9 @@ namespace{
         return false;
     }
 
-    size_t _compute_idx_from_coords(std::vector<size_t> coords, std::vector<size_t>& strides ){
-        size_t offset = 0;
-        for(size_t i = 0; i < coords.size();i ++){
+    std::size_t _compute_idx_from_coords(std::vector<size_t>& coords, std::vector<size_t>& strides ){
+        std::size_t offset = 0;
+        for(std::size_t i = 0; i < coords.size(); i++){
             offset += (coords[i] * strides[i]);
         }
         return offset;

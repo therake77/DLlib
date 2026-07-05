@@ -16,6 +16,7 @@ public:
     
     std::shared_ptr<Tensor> backward( const Tensor& original_in ,const Tensor& labels );
 
+    void set_random_weights();
     void set_mode(LayerMode);
     void update_weights(float);
     void training(Tensor&, Tensor&);

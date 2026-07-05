@@ -78,6 +78,17 @@ if(CMAKE_CUDA_COMPILER)
     )
 endif()
 
+if(MSVC)
+    target_compile_options(cnn_lib PRIVATE
+        "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/Zi>"
+        "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/Od>"
+    )
+    target_link_options(cnn_lib PRIVATE
+        $<$<CONFIG:Debug>:/DEBUG:FULL>
+    )
+endif()
+
+
 add_executable(tensor_test tests/tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE cnn_lib)
 
@@ -134,4 +145,31 @@ if(CMAKE_CUDA_COMPILER)
     target_link_libraries(cnn_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(kernel_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(main PRIVATE CUDA::cuda_driver)
+endif()
+
+if(MSVC)
+    
+    target_compile_options(flat_mnist_dataset_test PRIVATE
+        $<$<CONFIG:Debug>:/Zi>
+        $<$<CONFIG:Debug>:/Od>
+    )
+    target_link_options(flat_mnist_dataset_test PRIVATE
+        $<$<CONFIG:Debug>:/DEBUG:FULL>
+    )
+
+    target_compile_options(cnn_test PRIVATE
+        $<$<CONFIG:Debug>:/Zi>
+        $<$<CONFIG:Debug>:/Od>
+    )
+    target_link_options(cnn_test PRIVATE
+        $<$<CONFIG:Debug>:/DEBUG:FULL>
+    )
+
+    target_compile_options(main PRIVATE
+        $<$<CONFIG:Debug>:/Zi>
+        $<$<CONFIG:Debug>:/Od>
+    )
+    target_link_options(main PRIVATE
+        $<$<CONFIG:Debug>:/DEBUG:FULL>
+    )
 endif()

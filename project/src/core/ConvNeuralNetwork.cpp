@@ -30,7 +30,7 @@ std::shared_ptr<Tensor> ConvNN::forward( const Tensor& input , const Tensor& lab
         this->nn_layers[i]->forward(*(this->nn_layers[i-1]->_forward_out));
     }
     //And for the output layer:
-    auto last_layer = dynamic_cast<OutputLayer&>(*(this->nn_layers[n_layers-1]));
+    auto& last_layer = dynamic_cast<OutputLayer&>(*(this->nn_layers[n_layers-1]));
     last_layer.forward(*(this->nn_layers[n_layers-2]->_forward_out),labels);
     return this->nn_layers[this->nn_layers.size()-1]->_forward_out;
 }
@@ -38,15 +38,22 @@ std::shared_ptr<Tensor> ConvNN::forward( const Tensor& input , const Tensor& lab
 std::shared_ptr<Tensor> ConvolutionalNeuralNetwork::backward(const Tensor& input, const Tensor& labels){
     assert(this->nn_layers.size() > 2);
     std::size_t n_layers = this->nn_layers.size();
-    auto last_layer = dynamic_cast<OutputLayer&>(*(this->nn_layers[n_layers-1]));
+    auto& last_layer = dynamic_cast<OutputLayer&>(*(this->nn_layers[n_layers-1]));
     last_layer.backward(labels,*(this->nn_layers[n_layers-2]->_forward_out));
     for(std::size_t i = n_layers-1; i--> 1; ){
         this->nn_layers[i]->backward(*(this->nn_layers[i+1]->_backward_out),*(this->nn_layers[i-1]->_forward_out));
     }
-    
+
     this->nn_layers[0]->backward(*(this->nn_layers[1]->_backward_out),input);
     return this->nn_layers[0]->_backward_out;
 }
+
+void ConvNN::set_random_weights(){
+    for(std::size_t i = 0; i < this->nn_layers.size(); i++){
+        this->nn_layers[i]->he_initialization();
+    }
+}
+
 
 void ConvNN::update_weights( float learning_rate ){
     for(std::size_t i = 0; i < this->nn_layers.size(); i++){
@@ -63,6 +70,6 @@ void ConvNN::set_mode(LayerMode mode){
 }
 
 void ConvNN::training(Tensor& batched_dataset, Tensor& label ){
-    
+
     return;
 }

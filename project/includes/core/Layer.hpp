@@ -22,7 +22,9 @@ public:
     virtual std::shared_ptr<Tensor> backward( const Tensor&, const Tensor& ) = 0;
     virtual void update_weight(float learning_rate) = 0;
 
-    virtual void he_initialization( float std_dev );
+    virtual void he_initialization(){
+        return;
+    }
 
     inline void set_mode(LayerMode mode){ this->mode = mode; }
 

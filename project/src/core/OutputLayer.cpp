@@ -12,7 +12,7 @@ OutputLayer::OutputLayer(
 Inference forward pass
 */
 std::shared_ptr<Tensor> OutputLayer::forward( const Tensor& in ){
-    
+
     if( mode == LayerMode::Inference){
         __check_initialization(this->_forward_out,in.shape);
 
@@ -29,7 +29,7 @@ std::shared_ptr<Tensor> OutputLayer::forward( const Tensor& in ){
 
 std::shared_ptr<Tensor> OutputLayer::forward(const Tensor& in, const Tensor& labels){
     if(this->mode == LayerMode::Training){
-        std::size_t batchs = in.shape[0]; 
+        std::size_t batchs = in.shape[0];
         __check_initialization(this->_forward_out,in.shape);
         _probabilities.resize(in.shape);
         TensorMath::softmax(
@@ -55,12 +55,7 @@ std::shared_ptr<Tensor> OutputLayer::forward(const Tensor& in, const Tensor& lab
             1,
             *(this->_forward_out)
         );
-        this->_forward_out->resize(Shape({1}));
-        TensorMath::sum(
-            *(this->_grad),
-            0,
-            *(this->_forward_out)
-        );
+        //_forward_out now holds the per-sample loss vector, shape (N,)
         TensorMath::scale(
             *(this->_forward_out),
             -1.0f,
