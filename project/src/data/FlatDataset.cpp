@@ -1,6 +1,5 @@
 #include <data/FlatDataset.hpp>
 
-#include <cstring>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
@@ -135,9 +134,33 @@ Tensor FlatDataset::load_cpu(std::size_t index) const {
 }
 
 
+void FlatDataset::load_cpu(std::size_t index, Tensor& out) const {
+    _check_index(index);
+
+    Shape expected_shape({1, _channels, _height, _width});
+
+    if(out.getDevice()->get_type() != DeviceType::CPU) {
+        throw std::runtime_error("Error: FlatDataset load_cpu output tensor must be on CPU");
+    }
+
+    if(out.shape != expected_shape) {
+        out.resize(expected_shape);
+    }
+
+    std::size_t sample_elements = _sample_elements();
+    const float* src = _images.data() + index * sample_elements;
+    out.copy_from(src, sample_elements);
+}
 
 Tensor FlatDataset::load(std::size_t index) const {
-    Tensor image = load_cpu(index);
+    Tensor image(
+        {1, _channels, _height, _width},
+        DeviceManager::get_cpu_device(),
+        0.0f,
+        true
+    );
+
+    load_cpu(index, image);
     if(_dev->get_type() != DeviceType::CPU) {
         image.to(_dev);
     }
@@ -157,8 +180,36 @@ Tensor FlatDataset::load_batch_cpu(std::size_t start, std::size_t batch_size) co
     );
 }
 
+void FlatDataset::load_batch_cpu(std::size_t start, std::size_t batch_size, Tensor& out) const {
+    std::size_t actual_batch_size = _checked_batch_size(start, batch_size);
+
+    Shape expected_shape({actual_batch_size, _channels, _height, _width});
+
+    if(out.getDevice()->get_type() != DeviceType::CPU) {
+        throw std::runtime_error("Error: FlatDataset load_batch_cpu output tensor must be on CPU");
+    }
+
+    if(out.shape != expected_shape) {
+        out.resize(expected_shape);
+    }
+
+    std::size_t sample_elements = _sample_elements();
+    std::size_t batch_elements = actual_batch_size * sample_elements;
+    const float* src = _images.data() + start * sample_elements;
+    out.copy_from(src, batch_elements);
+}
+
 Tensor FlatDataset::load_batch(std::size_t start, std::size_t batch_size) const {
-    Tensor batch = load_batch_cpu(start, batch_size);
+    std::size_t actual_batch_size = _checked_batch_size(start, batch_size);
+
+    Tensor batch(
+        {actual_batch_size, _channels, _height, _width},
+        DeviceManager::get_cpu_device(),
+        0.0f,
+        true
+    );
+
+    load_batch_cpu(start, batch_size, batch);
     if(_dev->get_type() != DeviceType::CPU) {
         batch.to(_dev);
     }

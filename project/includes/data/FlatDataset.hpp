@@ -22,9 +22,11 @@ public:
     );
 
     Tensor load_cpu(std::size_t index) const;
+    void load_cpu(std::size_t index, Tensor& out) const;
     Tensor load(std::size_t index) const;
 
     Tensor load_batch_cpu(std::size_t start, std::size_t batch_size) const;
+    void load_batch_cpu(std::size_t start, std::size_t batch_size, Tensor& out) const;
     Tensor load_batch(std::size_t start, std::size_t batch_size) const;
 
     Tensor labels_one_hot_cpu(std::size_t start, std::size_t batch_size) const;
