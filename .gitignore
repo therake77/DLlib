@@ -1,2 +1,5 @@
 .vscode
+.agents
 build/
+datasets/*
+!datasets/.gitkeep

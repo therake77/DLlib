@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.18)
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 project(llcnn VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -10,6 +15,7 @@ if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
     
     set(CMAKE_CUDA_ARCHITECTURES native)
     find_package(CUDAToolkit REQUIRED)
@@ -33,6 +39,16 @@ set(SRC_FILES
     project/src/core/Tensor.cpp
     project/src/core/Shape.cpp
     project/src/core/ConvNeuralNetwork.cpp
+    project/src/data/stb_image.cpp
+    project/src/data/stb_image_resize.cpp
+    project/src/data/ImageLoader.cpp
+    project/src/data/Dataset.cpp
+    project/src/data/DataLoader.cpp
+    project/src/data/FlatDataset.cpp
+    project/src/data/transforms/CenterCrop.cpp
+    project/src/data/transforms/Compose.cpp
+    project/src/data/transforms/Normalize.cpp
+    project/src/data/transforms/Resize.cpp
     project/src/hardware/CpuDevice.cpp
     project/src/hardware/DeviceManager.cpp
     project/src/math/CpuMath.cpp
@@ -56,6 +72,10 @@ if(CMAKE_CUDA_COMPILER)
             "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>"
         )
     endif()
+    target_link_libraries(cnn_lib PUBLIC CUDA::curand CUDA::cuda_driver)
+    target_link_options(cnn_lib INTERFACE
+        $<$<CXX_COMPILER_ID:MSVC>:/NODEFAULTLIB:LIBCMT>
+    )
 endif()
 
 add_executable(tensor_test tests/tensor_test.cpp)
@@ -76,6 +96,32 @@ target_link_libraries(cnn_test PRIVATE cnn_lib)
 add_executable(kernel_test tests/kernel_tests.cpp)
 target_link_libraries(kernel_test PRIVATE cnn_lib)
 
+add_executable(dataset_test tests/dataset_test.cpp)
+target_link_libraries(dataset_test PRIVATE cnn_lib)
+
+add_executable(dataloader_test tests/dataloader_test.cpp)
+target_link_libraries(dataloader_test PRIVATE cnn_lib)
+
+add_executable(dataset_transform_test tests/dataset_transform_test.cpp)
+target_link_libraries(dataset_transform_test PRIVATE cnn_lib)
+
+add_executable(resize_test tests/resize_test.cpp)
+target_link_libraries(resize_test PRIVATE cnn_lib)
+
+add_executable(normalize_test tests/normalize_test.cpp)
+target_link_libraries(normalize_test PRIVATE cnn_lib)
+
+add_executable(center_crop_test tests/center_crop_test.cpp)
+target_link_libraries(center_crop_test PRIVATE cnn_lib)
+
+add_executable(dataset_real_test tests/dataset_real_test.cpp)
+target_link_libraries(dataset_real_test PRIVATE cnn_lib)
+
+add_executable(dataset_real_transform_test tests/dataset_real_transform_test.cpp)
+target_link_libraries(dataset_real_transform_test PRIVATE cnn_lib)
+
+add_executable(flat_mnist_dataset_test tests/flat_mnist_dataset_test.cpp)
+target_link_libraries(flat_mnist_dataset_test PRIVATE cnn_lib)
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(tensor_test PRIVATE CUDA::cuda_driver)

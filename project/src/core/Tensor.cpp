@@ -34,6 +34,39 @@ Tensor::Tensor(
 
 }
 
+Tensor::Tensor(
+    std::array<size_t,TENSOR_MAX_DIM> _shape,
+    const float* src,
+    std::shared_ptr<Device> device
+)
+: shape(_shape), device(device), cpu_data(nullptr, [](void* ptr){}), gpu_data(nullptr, nullptr) {
+    if(src == nullptr) {
+        throw std::runtime_error("Error: Tensor source pointer is null");
+    }
+
+    auto currDev = this->device.get();
+    void* data_ptr = currDev->allocate(shape.n_elements * sizeof(float));
+    if(data_ptr == nullptr){
+        throw std::runtime_error("Failed memory allocation");
+    }
+
+    if(this->device->get_type() == DeviceType::CPU){
+        std::memcpy(data_ptr, src, shape.n_elements * sizeof(float));
+    }else{
+        this->device->copy_to_device(data_ptr, src, shape.n_elements * sizeof(float));
+    }
+
+    auto deleter = [currDev](void* p){
+        currDev->free(p);
+    };
+
+    if(this->device->get_type() == DeviceType::CPU){
+        this->cpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr, deleter);
+    }else{
+        this->gpu_data = std::unique_ptr<void, std::function<void(void*)>>(data_ptr, deleter);
+    }
+}
+
 
 Tensor::Tensor(const Tensor& t, const std::shared_ptr<Device> device) : device(device), shape(t.shape._shapes), cpu_data(nullptr, [](void*){}), gpu_data(nullptr, [](void*){}) {
 
