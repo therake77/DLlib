@@ -22,6 +22,7 @@
     public:
         Shape shape;
         Tensor(std::array<size_t,TENSOR_MAX_DIM>, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float = 0.0f, bool = false);    
+        Tensor(std::array<size_t,TENSOR_MAX_DIM>, const float*, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
         Tensor(const Tensor&, const std::shared_ptr<Device> = DeviceManager::get_cpu_device());
         float* data();
         const float* data() const;
