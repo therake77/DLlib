@@ -50,11 +50,8 @@ Tensor::Tensor(
         throw std::runtime_error("Failed memory allocation");
     }
 
-    if(this->device->get_type() == DeviceType::CPU){
-        std::memcpy(data_ptr, src, shape.n_elements * sizeof(float));
-    }else{
-        this->device->copy_to_device(data_ptr, src, shape.n_elements * sizeof(float));
-    }
+    //If device is CPU, then is memcpy, else is cudaMemcpy. device handles that
+    this->device->copy_to_device(data_ptr, src, shape.n_elements * sizeof(float));
 
     auto deleter = [currDev](void* p){
         currDev->free(p);
@@ -249,6 +246,25 @@ void Tensor::zeros(){
             throw std::runtime_error("Error: Unexpected device type ");
             break;
     }
+}
+
+void Tensor::normal_rand(float mean, float std_dev){
+    /*
+        Straightforward: Call device->normal_rand_... over the current pointer
+    */
+   auto device = this->device;
+   auto deviceType = device->get_type();
+   switch(deviceType){
+        case DeviceType::CPU:
+            device->memset_rand_normal_dist(this->cpu_data.get(),mean,std_dev,this->shape.n_elements);
+            break;
+        case DeviceType::GPU:
+            device->memset_rand_normal_dist(this->gpu_data.get(),mean,std_dev,this->shape.n_elements);
+            break;
+        default:
+            std::runtime_error("Unexpected device");
+            break;
+   }
 }
 
 Tensor& Tensor::unsqueeze(std::size_t axis){

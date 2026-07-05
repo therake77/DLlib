@@ -35,6 +35,8 @@ public:
     */
     void memset_rand(void*dst, size_t n) override;
 
+    void memset_rand_normal_dist( void* dst, float mean, float std_dev, size_t n_bytes ) override ;
+
     /*
         @brief Copy the contents of src, making it contiguous according to `shapes`
     */

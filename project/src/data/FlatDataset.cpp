@@ -134,6 +134,8 @@ Tensor FlatDataset::load_cpu(std::size_t index) const {
     );
 }
 
+
+
 Tensor FlatDataset::load(std::size_t index) const {
     Tensor image = load_cpu(index);
     if(_dev->get_type() != DeviceType::CPU) {

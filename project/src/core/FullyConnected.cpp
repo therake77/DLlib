@@ -69,13 +69,23 @@ std::shared_ptr<Tensor> FullyConnected::backward(const Tensor& backward_grad, co
 }
 
 
-void FullyConnected::update_weight(){
+void FullyConnected::update_weight(float lr){
     assert(this->_bias_grad.get() != nullptr);
     assert(this->_grad.get() != nullptr);
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         this->_weights,
         *(this->_grad),
         this->_weights
+    );
+    TensorMath::scale(
+        *(this->_bias_grad),
+        lr,
+        *(this->_bias_grad)
     );
     TensorMath::add(
         this->_bias,
@@ -83,4 +93,9 @@ void FullyConnected::update_weight(){
         this->_bias
     );
     return;
+}
+
+void FullyConnected::he_initialization(float std_dev){
+    this->_weights.normal_rand(0.0f,std_dev);
+    this->_bias.normal_rand(0.0f,std_dev);
 }

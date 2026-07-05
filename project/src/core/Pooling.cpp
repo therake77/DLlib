@@ -48,7 +48,7 @@ std::shared_ptr<Tensor> MaxPooling::backward( const Tensor& backward_grad, const
 }
 
 
-void MaxPooling::update_weight(){
+void MaxPooling::update_weight(float){
     //Do nothing
     return;
 }
@@ -94,7 +94,7 @@ std::shared_ptr<Tensor> AvgPooling::backward( const Tensor& backward_grad, const
     return this->_backward_out;
 }
 
-void AvgPooling::update_weight(){
+void AvgPooling::update_weight(float){
     //No weights to update
     return;
 }

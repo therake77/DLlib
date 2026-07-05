@@ -92,7 +92,7 @@ std::shared_ptr<Tensor> ActivationLayer::backward( const Tensor& backward_grad, 
     return this->_backward_out;
 }
 
-void ActivationLayer::update_weight(){
+void ActivationLayer::update_weight(float){
     //Does nothing: No weigths in this layer
     return;
 }

@@ -24,6 +24,6 @@ std::shared_ptr<Tensor> Flatten::backward( const Tensor& backward_grad, const Te
     return this->_backward_out;
 }
 
-void Flatten::update_weight(){
+void Flatten::update_weight(float){
     return;
 }

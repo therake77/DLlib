@@ -255,13 +255,23 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     return this->_backward_out;
 }
 
-void BatchNorm::update_weight(){
+void BatchNorm::update_weight(float lr){
     assert(this->_grad.get() != nullptr);
-    //This is quite simple, just add _grad to _gamma and _beta_grad to _beta
+    //This is quite simple, just add _grad*lr to _gamma and _beta_grad*lr to _beta
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         *(this->_grad),
         _gamma,
         _gamma
+    );
+    TensorMath::scale(
+        this->_beta_grad,
+        lr,
+        this->_beta_grad
     );
     TensorMath::add(
         this->_beta_grad,
