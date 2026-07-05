@@ -31,6 +31,7 @@
         void resize(Shape s);
         void reshape(std::array<std::size_t, TENSOR_MAX_DIM> new_shape);
         void copy_from(const Tensor& t);
+        void copy_from(const float* src, std::size_t count);
         void zeros();
         Tensor& unsqueeze(std::size_t axis);
         void inner_expand(std::size_t dims);
