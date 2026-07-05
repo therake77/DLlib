@@ -70,6 +70,21 @@ namespace LLCN_KERNELS{
         curand_init(seed,idx,0,&state);
         dst[idx] = curand_uniform(&state);
     }
+
+    __global__ void normal_rand_fill_kernel(
+        float* dst,
+        std::size_t n,
+        float mean,
+        float std_dev,
+        unsigned long long seed
+    ){
+        size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        if(idx >= n) return;
+        curandState state;
+        curand_init(seed,idx,0,&state);
+        dst[idx] = (curand_normal(&state) * std_dev) + mean;
+    }
+
 };
 
 
@@ -135,6 +150,27 @@ namespace LLCN_KERNELS{
         }
         dst[flat_idx] = src[src_idx];
     }
+}
+
+void GpuDevice::memset_rand_normal_dist(void* dst, float mean, float std_dev, size_t _n){
+    float* f_dst = static_cast<float*>(dst);
+    constexpr std::size_t block_size = 256;
+    std::size_t grid_size = (_n + block_size - 1) / block_size;
+    unsigned long long seed = (unsigned long long)std::chrono::system_clock::now()
+                                .time_since_epoch().count();
+    LLCN_KERNELS::normal_rand_fill_kernel<<<grid_size,block_size>>>(
+        f_dst,
+        _n,
+        mean,
+        std_dev,
+        seed
+    );
+
+    auto result = cudaDeviceSynchronize();
+    if(result != cudaSuccess){
+        throw std::runtime_error("Error: Initializing memory with random values failed");
+    }
+    return;
 }
 
 void GpuDevice::make_contiguous(

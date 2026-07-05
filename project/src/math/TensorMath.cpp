@@ -211,7 +211,7 @@ void TensorMath::divide(const Tensor& a, const Tensor&b, Tensor& out){
 
 
     auto device = a.getDevice();
-    device->math->multiply(
+    device->math->divide(
         a.data(),
         a_shape,
         b.data(),

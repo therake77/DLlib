@@ -24,9 +24,9 @@ namespace{
         return false;
     }
 
-    size_t _compute_idx_from_coords(std::vector<size_t> coords, std::vector<size_t>& strides ){
-        size_t offset = 0;
-        for(size_t i = 0; i < coords.size();i ++){
+    std::size_t _compute_idx_from_coords(std::vector<size_t>& coords, std::vector<size_t>& strides ){
+        std::size_t offset = 0;
+        for(std::size_t i = 0; i < coords.size(); i++){
             offset += (coords[i] * strides[i]);
         }
         return offset;
@@ -65,7 +65,18 @@ void CpuDevice::memset_rand(void* dst, size_t _n){
     float* f_dst = static_cast<float*>(dst);
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist(0.0f,1.0f);
+    std::normal_distribution<float> dist(0.0f,1.0f);
+
+    for(size_t i = 0 ; i < _n; i++){
+        f_dst[i] = dist(gen); 
+    }
+}
+
+void CpuDevice::memset_rand_normal_dist(void* dst, float mean, float std_dev, size_t _n){
+    float* f_dst = static_cast<float*>(dst);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<float> dist(mean, std_dev);
 
     for(size_t i = 0 ; i < _n; i++){
         f_dst[i] = dist(gen); 

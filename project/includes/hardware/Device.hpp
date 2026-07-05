@@ -40,12 +40,14 @@ public:
         @brief Sets `dst` with `n` floats with value `value`
         @note `n` is the number of floats, not the number of bytes
     */
-    virtual void memset(void* dst, float value, size_t size) = 0;
+    virtual void memset(void* dst, float value, size_t n_bytes) = 0;
     /*
-        @brief Sets `dst` with `n` floats randomly generated
+        @brief Sets `dst` with `n` floats randomly generated from a normal distribution of 0,1
         @note `n` is the number of floats, not the number of bytes
     */
     virtual void memset_rand(void*dst, size_t size) = 0;
+
+    virtual void memset_rand_normal_dist( void* dst, float mean, float std_dev, size_t _n ) = 0;
 
     virtual DeviceType get_type() const = 0;
     virtual std::string get_name() const = 0;

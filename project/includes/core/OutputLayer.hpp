@@ -1,9 +1,9 @@
+#pragma once
 #include <core/Layer.hpp>
 
 class OutputLayer : public Layer{
 private:
 
-    Tensor _labels;
     Tensor _probabilities;
     std::size_t _logits;
 public:
@@ -15,6 +15,6 @@ public:
 
     std::shared_ptr<Tensor> forward( const Tensor& ) override;
     std::shared_ptr<Tensor> backward( const Tensor&, const Tensor& ) override;
-    void update_weight() override;
-    void set_labels(Tensor& labels);
+    std::shared_ptr<Tensor> forward( const Tensor&, const Tensor& );
+    void update_weight(float) override;
 };
