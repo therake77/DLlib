@@ -58,8 +58,8 @@ namespace{
         return false;
     }
 
-    size_t _compute_idx_from_coords(std::vector<size_t> coords, std::array<size_t,TENSOR_MAX_DIM> strides ){
-        size_t offset = 0;
+    std::size_t _compute_idx_from_coords(std::vector<size_t>& coords, std::array<size_t,TENSOR_MAX_DIM> strides ){
+        std::size_t offset = 0;
         for(size_t i = 0; i < coords.size();i ++){
             offset += (coords[i] * strides[i]);
         }
@@ -111,6 +111,7 @@ void CpuMath::sub(
     const float* b, Shape b_shape, 
     float* out, Shape out_shape
 ) {
+    assert(a_shape == b_shape && b_shape == out_shape);
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -219,7 +220,8 @@ void CpuMath::log(const float* a,  Shape a_shape, float* out, Shape out_shape){
             coords,
             out_shape._strides
         );
-        out[out_idx] = std::log(a[a_idx]);
+        //Clamp away from zero: log(0) is -inf, and -inf * 0 (e.g. one-hot labels) is NaN
+        out[out_idx] = std::log(std::max(a[a_idx], std::numeric_limits<float>::min()));
     }while(_increment_odometer(coords,a_shape._shapes));
 }
 
@@ -377,7 +379,7 @@ void CpuMath::conv2D(
                 
                 bool is_not_offset_region = in_h >= 0 && in_h < in_shape[2] && in_w >= 0 && in_w < in_shape[3];
                 patch[p_idx++] = is_not_offset_region ? in[
-                    _compute_idx_from_coords({out_coords[0],patch_coords[0],in_h,in_w}, in_shape._strides)
+                    _compute_idx_from_coords(std::vector<std::size_t> {out_coords[0],patch_coords[0],in_h,in_w}, in_shape._strides)
                 ] : 0.0f;
             }while(_increment_odometer(patch_coords,patch_shapes));
         }
@@ -430,11 +432,15 @@ void CpuMath::im2col2d(
         dim_t w_out = cols % W_out;
         dim_t h_out = (cols/W_out) % H_out;
         dim_t n = cols / (H_out * W_out);
-        dim_t h_in = h_out * strides[0] - padding[0] + delta_h;
-        dim_t w_in = w_out * strides[1] - padding[1] + delta_w;
+        ptrdiff_t h_in_signed = (ptrdiff_t)h_out * (ptrdiff_t)strides[0] - (ptrdiff_t)padding[0] + (ptrdiff_t)delta_h;
+        ptrdiff_t w_in_signed = (ptrdiff_t)w_out * (ptrdiff_t)strides[1] - (ptrdiff_t)padding[1] + (ptrdiff_t)delta_w;
         dim_t out_idx = _compute_idx_from_coords(out_coords,out_shape._strides);
-        if( h_in < H || w_in < W){
-            dim_t in_idx = _compute_idx_from_coords({n,c,h_in,w_in}, in_shape._strides);
+        if( h_in_signed>= 0 && h_in_signed < (ptrdiff_t)H && 
+            w_in_signed >= 0 && w_in_signed < (ptrdiff_t)W
+        ){
+            std::size_t h_in = h_in_signed;
+            std::size_t w_in = w_in_signed;
+            dim_t in_idx = _compute_idx_from_coords( std::vector<std::size_t> {n,c,h_in,w_in}, in_shape._strides);
             out[out_idx] = in[in_idx];
         }else{
             out[out_idx] = 0.0f;
@@ -479,11 +485,16 @@ void CpuMath::col2im2d(
         dim_t w_in = cols % W_in;
         dim_t h_in = (cols/W_in) % H_in;
         dim_t n = cols / (H_in * W_in);
-        dim_t h_out = h_in * strides[0] - padding[0] + delta_h;
-        dim_t w_out = w_in * strides[1] - padding[1] + delta_w;
+        ptrdiff_t h_out_signed = (ptrdiff_t)h_in * (ptrdiff_t)strides[0] - (ptrdiff_t)padding[0] + (ptrdiff_t)delta_h;
+        ptrdiff_t w_out_signed = (ptrdiff_t)w_in * (ptrdiff_t)strides[1] - (ptrdiff_t)padding[1] + (ptrdiff_t)delta_w;
         dim_t in_idx = _compute_idx_from_coords(in_coords,in_shape._strides);
-        if( h_in < H || w_in < W){
-            dim_t out_idx = _compute_idx_from_coords({n,c,h_out,w_out}, out_shape._strides);
+        if(
+            h_out_signed>= 0 && h_out_signed < (ptrdiff_t)H && 
+            w_out_signed >= 0 && w_out_signed < (ptrdiff_t)W
+         ){
+            std::size_t h_out = h_out_signed;
+            std::size_t w_out = w_out_signed;
+            dim_t out_idx = _compute_idx_from_coords( std::vector<std::size_t> {n,c,h_out,w_out}, out_shape._strides);
             out[out_idx] += in[in_idx];
         }
     }while(_increment_odometer(in_coords,in_shape._shapes));
@@ -581,7 +592,6 @@ void CpuMath::softmax(
                 out_shape._strides
             );
 
-            std::vector<float> acc(last_dim,0);
             float sum = 0;
             float max = std::numeric_limits<float>::lowest();
             //First, find the maximum element
@@ -672,7 +682,7 @@ void CpuMath::max_pooling2D(
             //Compute the coordinates of the input tensor
             std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
             std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t idx =  _compute_idx_from_coords({out_coords[0],out_coords[1], in_h, in_w},input_shape._strides);
+            std::size_t idx =  _compute_idx_from_coords(std::vector<std::size_t>{out_coords[0],out_coords[1], in_h, in_w},input_shape._strides);
             //If the computed coordinates are not in the padding region, compare the actual value
             if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
                 float value = input[idx];
@@ -718,7 +728,7 @@ void CpuMath::inv_max_pooling2D(
             //Compute the coordinates of the output tensor
             std::size_t out_h = pool_coords[2] * strides[0] - padding[0] + patch_coords[0];
             std::size_t out_w = pool_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t out_idx =  _compute_idx_from_coords({pool_coords[0],pool_coords[1], out_h, out_w},out_shape._strides);
+            std::size_t out_idx =  _compute_idx_from_coords(std::vector<std::size_t>{pool_coords[0],pool_coords[1], out_h, out_w},out_shape._strides);
             //If the computed coordinates are not in the padding region, compare the actual value
             if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
                 if(mask[out_idx] == 1){
@@ -766,7 +776,7 @@ void CpuMath::avg_pooling2D(
             //If the computed coordinates are not in the padding region, compare the actual value
             if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
                 float value = input[ _compute_idx_from_coords(
-                    {out_coords[0],out_coords[1], in_h, in_w},
+                    std::vector<std::size_t>{out_coords[0],out_coords[1], in_h, in_w},
                     input_shape._strides
                 )];
                 sum+=value;
@@ -804,7 +814,7 @@ void CpuMath::inv_avg_pooling2D(
         do{
             std::size_t out_h = pooled_coords[2] * strides[0] - padding[0] + patch_coords[0];
             std::size_t out_w = pooled_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t out_idx =  _compute_idx_from_coords({pooled_coords[0],pooled_coords[1], out_h, out_w},out_shape._strides);
+            std::size_t out_idx =  _compute_idx_from_coords(std::vector<std::size_t>{pooled_coords[0],pooled_coords[1], out_h, out_w},out_shape._strides);
             if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
                 out[out_idx] += to_add;
             }

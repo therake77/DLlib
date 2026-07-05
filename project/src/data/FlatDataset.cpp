@@ -133,6 +133,7 @@ Tensor FlatDataset::load_cpu(std::size_t index) const {
     );
 }
 
+
 void FlatDataset::load_cpu(std::size_t index, Tensor& out) const {
     _check_index(index);
 

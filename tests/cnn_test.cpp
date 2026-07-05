@@ -44,7 +44,7 @@ inline void fancy_print(const Tensor& a){
 }
 
 int main(){
-    auto device = DeviceManager::get_gpu_device();
+    auto device = DeviceManager::get_cpu_device();
     Conv2D conv_layer = Conv2D(
         {2,1,3,3},
         device,

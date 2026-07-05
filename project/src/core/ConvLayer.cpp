@@ -116,11 +116,22 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
 }
 
 
-void Conv2D::update_weight(){
+void Conv2D::update_weight(float lr){
     assert(this->_grad.get() != nullptr);
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         this->_kernels,
         *(this->_grad),
         this->_kernels
     );
-}   
+}
+
+void Conv2D::he_initialization(){
+    float fan_in = (float)this->_kernels.shape[1] * this->_kernels.shape[2] * this->_kernels.shape[3];
+    float std_dev = std::sqrt(2.0f/fan_in);
+    this->_kernels.normal_rand(0.0f,std_dev);
+}

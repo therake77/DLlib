@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cassert>
 #include <iostream>
+#include <cfloat>
 #ifdef __USE_CUDA__
 
 
@@ -256,7 +257,8 @@ namespace LLCN_MATH_KERNELS{
         _compute_coords_from_idx(idx,coords,out_shape,n_dims);
         size_t in_idx = _compute_idx_from_coords(coords,in_shape,n_dims);
         size_t out_idx = _compute_idx_from_coords(coords,out_shape,n_dims);
-        out[out_idx] = log(in[in_idx]);
+        //Clamp away from zero: log(0) is -inf, and -inf * 0 (e.g. one-hot labels) is NaN
+        out[out_idx] = log(fmaxf(in[in_idx], FLT_MIN));
     };
 
     __global__ void reLU_kernel(

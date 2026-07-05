@@ -19,7 +19,7 @@ FullyConnected::FullyConnected(
 }
 
 std::shared_ptr<Tensor> FullyConnected::forward(const Tensor& in){
-    //IMPORTANT: in is 2-dimensional (N,F) (batch, flatten)    
+    //IMPORTANT: in is 2-dimensional (N,F) (batch, flatten)
     //Well, everyone knows the forward pass Y= XW + b
     __check_initialization(this->_forward_out,Shape({in.shape[0],this->output_dim}));
     TensorMath::matmul(
@@ -69,13 +69,23 @@ std::shared_ptr<Tensor> FullyConnected::backward(const Tensor& backward_grad, co
 }
 
 
-void FullyConnected::update_weight(){
+void FullyConnected::update_weight(float lr){
     assert(this->_bias_grad.get() != nullptr);
     assert(this->_grad.get() != nullptr);
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         this->_weights,
         *(this->_grad),
         this->_weights
+    );
+    TensorMath::scale(
+        *(this->_bias_grad),
+        lr,
+        *(this->_bias_grad)
     );
     TensorMath::add(
         this->_bias,
@@ -83,4 +93,11 @@ void FullyConnected::update_weight(){
         this->_bias
     );
     return;
+}
+
+void FullyConnected::he_initialization(){
+    std::size_t fan_in = this->input_dim;
+    float std_dev = std::sqrt(2.0f/(float)fan_in);
+    this->_weights.normal_rand(0.0f,std_dev);
+    this->_bias.normal_rand(0.0f,std_dev);
 }
