@@ -30,14 +30,14 @@ std::shared_ptr<Tensor> OutputLayer::forward( const Tensor& in ){
 std::shared_ptr<Tensor> OutputLayer::forward(const Tensor& in, const Tensor& labels){
     if(this->mode == LayerMode::Training){
         std::size_t batchs = in.shape[0];
-        __check_initialization(this->_forward_out,in.shape);
         _probabilities.resize(in.shape);
         TensorMath::softmax(
             in,
             this->_probabilities
         );
 
-        Tensor log_probs {in.shape._shapes,this->_dev};
+        __check_initialization(this->_backward_out, in.shape);
+        Tensor& log_probs = *(this->_backward_out);
 
         TensorMath::log(
             this->_probabilities, //And then, use _forward_out to compute the rest

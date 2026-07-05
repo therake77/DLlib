@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 
 int main(){
     auto dev = DeviceManager::get_cpu_device();
-    fs::path root = "C:\\Users\\USER\\Documents\\llcnn\\datasets\\mnist\\flat";
+    fs::path root = "datasets/mnist/flat";
     std::cout << root<< std::endl;
     fs::path train_images = root / "train_images_float32.bin";
     fs::path train_labels = root / "train_labels_uint8.bin";
@@ -113,11 +113,12 @@ int main(){
     //Negative sign because every layer's update_weight() applies param += lr*grad (ascent),
     //so this flips it into a descent step. TODO: fix the sign at the source in each update_weight().
     float lr = -0.01;
-    Tensor delta = Tensor({1});
+    Tensor delta = Tensor({1}, dev, 0.0f, true);
     do{
         std::cout<<"Epoch: "<<std::to_string(epoch)<<std::endl;
         std::size_t curr_index = 0;
-        std::size_t batch_size = 64;
+        std::size_t batch_size = 32;
+        std::size_t samples_per_epoch = 320;
         
         do{
             std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
@@ -125,6 +126,7 @@ int main(){
             Tensor labels = dataset.labels_one_hot_cpu(curr_index,batch_size);
             /*Result contains a (N,) vector of errors*/
             auto errors = cnn.forward(input,labels);
+            delta.zeros();
             TensorMath::sum(
                 *errors,
                 0,
@@ -137,16 +139,14 @@ int main(){
             );
 
             /*Now delta has the error*/
-            /*Do something here with the error*/
-            fancy_print(*errors);
-            fancy_print(delta);
+            std::cout<<"Loss: "<<delta.data()[0]<<std::endl;
 
             /*Now start backward pass and update*/
 
             cnn.backward(input,labels);
             cnn.update_weights(lr);
             curr_index+=batch_size;
-        }while(curr_index + batch_size <= 1,280);
+        }while(curr_index + batch_size <= samples_per_epoch);
         epoch--;
     }while (epoch > 0);
 

@@ -474,6 +474,7 @@ void TensorMath::sum(const Tensor& a, std::size_t axis, Tensor& out){
     _ensure_same_shape(a_shape_copy,out_shape_copy);
     //Because of traumas, explicitly zero the axis stride on out
     out_shape_copy._strides[axis] = 0;
+    out.zeros();
     auto dev = a.getDevice();
     dev->math->sum(
         a.data(),

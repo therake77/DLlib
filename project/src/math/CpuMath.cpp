@@ -6,18 +6,9 @@
 #include <algorithm>
 #include <string>
 #include <limits>
+#include <cstring>
 
 namespace{
-    /* Probably would be use for something in the future*/
-    bool _is_contiguous(const std::array<size_t,TENSOR_MAX_DIM> _strides){
-        size_t expected_stride = 1;
-        for(size_t i = _strides.size() - 1; i >= 0; --i ){
-            if(_strides[i] != expected_stride){ return false; }
-            expected_stride*=_strides[i];
-        }
-        return true;
-    }
-
     void _standard_2d_matrix_mul(
         const float* a, const float* b, float* out, 
         size_t M, size_t N, size_t K,
@@ -25,16 +16,124 @@ namespace{
         size_t stride_bk, size_t stride_bn,
         size_t stride_outm, size_t stride_outn
     ){
-        for(int m = 0; m < M; ++m){
-            for(int n = 0; n < N; ++n){
+        for(size_t m = 0; m < M; ++m){
+            for(size_t n = 0; n < N; ++n){
                 float sum = 0.0f;
-                for(int k = 0; k < K; ++k){
-                    int a_idx = (m * stride_am) + (k * stride_ak);
-                    int b_idx = (k * stride_bk) + (n * stride_bn);
+                for(size_t k = 0; k < K; ++k){
+                    size_t a_idx = (m * stride_am) + (k * stride_ak);
+                    size_t b_idx = (k * stride_bk) + (n * stride_bn);
                     sum += a[a_idx]*b[b_idx];
                 }
-                int out_idx = (m * stride_outm) + (n * stride_outn);
+                size_t out_idx = (m * stride_outm) + (n * stride_outn);
                 out[out_idx] = sum;
+            }
+        }
+    }
+
+    bool _is_contiguous_2d(const Shape& shape){
+        return shape.n_dim == 2 &&
+            shape._strides[0] == shape[1] &&
+            shape._strides[1] == 1;
+    }
+
+    bool _is_contiguous(const Shape& shape){
+        size_t expected_stride = 1;
+        for(size_t i = shape.n_dim; i-- > 0; ){
+            if(shape._strides[i] != expected_stride){
+                return false;
+            }
+            expected_stride *= shape[i];
+        }
+        return true;
+    }
+
+    bool _is_channel_broadcast_4d(const Shape& shape){
+        return shape.n_dim == 4 &&
+            shape._strides[0] == 0 &&
+            shape._strides[1] == 1 &&
+            shape._strides[2] == 0 &&
+            shape._strides[3] == 0;
+    }
+
+    template<typename Op>
+    bool _try_binary_fast_path(
+        const float* a, Shape a_shape,
+        const float* b, Shape b_shape,
+        float* out, Shape out_shape,
+        Op op
+    ){
+        if(
+            a_shape._shapes == out_shape._shapes &&
+            b_shape._shapes == out_shape._shapes &&
+            _is_contiguous(a_shape) &&
+            _is_contiguous(b_shape) &&
+            _is_contiguous(out_shape)
+        ){
+            for(size_t i = 0; i < out_shape.n_elements; ++i){
+                out[i] = op(a[i], b[i]);
+            }
+            return true;
+        }
+
+        if(out_shape.n_dim == 4 && _is_contiguous(out_shape)){
+            size_t N = out_shape[0];
+            size_t C = out_shape[1];
+            size_t HW = out_shape[2] * out_shape[3];
+
+            if(
+                a_shape._shapes == out_shape._shapes &&
+                b_shape._shapes == out_shape._shapes &&
+                _is_contiguous(a_shape) &&
+                _is_channel_broadcast_4d(b_shape)
+            ){
+                for(size_t n = 0; n < N; ++n){
+                    for(size_t c = 0; c < C; ++c){
+                        float b_value = b[c];
+                        size_t base = (n * C + c) * HW;
+                        for(size_t hw = 0; hw < HW; ++hw){
+                            out[base + hw] = op(a[base + hw], b_value);
+                        }
+                    }
+                }
+                return true;
+            }
+
+            if(
+                a_shape._shapes == out_shape._shapes &&
+                b_shape._shapes == out_shape._shapes &&
+                _is_channel_broadcast_4d(a_shape) &&
+                _is_contiguous(b_shape)
+            ){
+                for(size_t n = 0; n < N; ++n){
+                    for(size_t c = 0; c < C; ++c){
+                        float a_value = a[c];
+                        size_t base = (n * C + c) * HW;
+                        for(size_t hw = 0; hw < HW; ++hw){
+                            out[base + hw] = op(a_value, b[base + hw]);
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void _contiguous_2d_matrix_mul(
+        const float* a, const float* b, float* out,
+        size_t M, size_t N, size_t K
+    ){
+        std::fill(out, out + M * N, 0.0f);
+        for(size_t m = 0; m < M; ++m){
+            float* out_row = out + m * N;
+            const float* a_row = a + m * K;
+            for(size_t k = 0; k < K; ++k){
+                const float a_value = a_row[k];
+                const float* b_row = b + k * N;
+                for(size_t n = 0; n < N; ++n){
+                    out_row[n] += a_value * b_row[n];
+                }
             }
         }
     }
@@ -83,6 +182,10 @@ void CpuMath::add(
     const float* b, Shape b_shape, 
     float* out, Shape out_shape
 ){
+    if(_try_binary_fast_path(a, a_shape, b, b_shape, out, out_shape, [](float x, float y){ return x + y; })){
+        return;
+    }
+
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -112,6 +215,10 @@ void CpuMath::sub(
     float* out, Shape out_shape
 ) {
     assert(a_shape == b_shape && b_shape == out_shape);
+    if(_try_binary_fast_path(a, a_shape, b, b_shape, out, out_shape, [](float x, float y){ return x - y; })){
+        return;
+    }
+
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -151,6 +258,10 @@ void CpuMath::scale(const float* a, float* out, float _n, Shape shape) {
     @note The method is specially designed to support broadcasted tensors, using the provided shape strides
 */
 void CpuMath::divide(const float* a,  Shape a_shape, const float* b, Shape b_shape, float* out, Shape out_shape){
+    if(_try_binary_fast_path(a, a_shape, b, b_shape, out, out_shape, [](float x, float y){ return x / y; })){
+        return;
+    }
+
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -242,6 +353,10 @@ void CpuMath::multiply(
     float* out, Shape out_shape
 ) {
     assert(a_shape == b_shape);
+    if(_try_binary_fast_path(a, a_shape, b, b_shape, out, out_shape, [](float x, float y){ return x * y; })){
+        return;
+    }
+
     // All shapes are equal, and have the same dimensionality
     auto n_dim = a_shape.n_dim;
     auto shapes = a_shape._shapes;
@@ -292,16 +407,19 @@ void CpuMath::matmul(
     size_t stride_bn = b_shape._strides[max_dim - 1];
     size_t stride_outm = out_shape._strides[max_dim - 2];
     size_t stride_outn = out_shape._strides[max_dim - 1];
-    
-    /*Now comes the main algorithm*/
-    /* Calculate number of "batches" */
-    size_t total_batches = 1;
-    for(size_t i = 0; i < max_dim - 2; ++i){
-        total_batches*= a_shape[i];
+
+    if(
+        max_dim == 2 &&
+        _is_contiguous_2d(a_shape) &&
+        _is_contiguous_2d(b_shape) &&
+        _is_contiguous_2d(out_shape)
+    ){
+        _contiguous_2d_matrix_mul(a, b, out, M, N, K);
+        return;
     }
     
+    /*Now comes the main algorithm*/
     std::vector<size_t> coords(max_dim-2,0);
-    size_t count = 0;
 
     do{
         /*Calculate slices*/
@@ -414,38 +532,45 @@ void CpuMath::im2col2d(
 ){
     using dim_t = std::size_t;
     assert(out_shape.n_dim == 2);
-    //Compute the original height and width of the output (as if it was a normal window-sliding operation)
     dim_t N = in_shape[0], C = in_shape[1], H = in_shape[2], W = in_shape[3];
     dim_t H_window = window_shape[0], W_window = window_shape[1];
-    
     dim_t H_out = (H + 2 * padding[0] - H_window) / strides[0] + 1;
     dim_t W_out = (W + 2 * padding[1] - W_window) / strides[1] + 1;
-    //Iterate over the out array
-    std::vector<std::size_t> out_coords(out_shape.n_dim,0);
-    //For each index in the output matrix
-    do{
-        dim_t rows = out_coords[0], cols = out_coords[1];
-        //Compute what element in the input tensor corresponds to this index
-        dim_t delta_w = rows % W_window;
-        dim_t delta_h = (rows/W_window) % H_window;
-        dim_t c = rows / (H_window * W_window);
-        dim_t w_out = cols % W_out;
-        dim_t h_out = (cols/W_out) % H_out;
-        dim_t n = cols / (H_out * W_out);
-        ptrdiff_t h_in_signed = (ptrdiff_t)h_out * (ptrdiff_t)strides[0] - (ptrdiff_t)padding[0] + (ptrdiff_t)delta_h;
-        ptrdiff_t w_in_signed = (ptrdiff_t)w_out * (ptrdiff_t)strides[1] - (ptrdiff_t)padding[1] + (ptrdiff_t)delta_w;
-        dim_t out_idx = _compute_idx_from_coords(out_coords,out_shape._strides);
-        if( h_in_signed>= 0 && h_in_signed < (ptrdiff_t)H && 
-            w_in_signed >= 0 && w_in_signed < (ptrdiff_t)W
-        ){
-            std::size_t h_in = h_in_signed;
-            std::size_t w_in = w_in_signed;
-            dim_t in_idx = _compute_idx_from_coords( std::vector<std::size_t> {n,c,h_in,w_in}, in_shape._strides);
-            out[out_idx] = in[in_idx];
-        }else{
-            out[out_idx] = 0.0f;
+
+    for(dim_t c = 0; c < C; ++c){
+        for(dim_t kh = 0; kh < H_window; ++kh){
+            for(dim_t kw = 0; kw < W_window; ++kw){
+                dim_t row = (c * H_window + kh) * W_window + kw;
+                for(dim_t n = 0; n < N; ++n){
+                    for(dim_t oh = 0; oh < H_out; ++oh){
+                        ptrdiff_t h_in = static_cast<ptrdiff_t>(oh * strides[0]) -
+                            static_cast<ptrdiff_t>(padding[0]) +
+                            static_cast<ptrdiff_t>(kh);
+                        for(dim_t ow = 0; ow < W_out; ++ow){
+                            ptrdiff_t w_in = static_cast<ptrdiff_t>(ow * strides[1]) -
+                                static_cast<ptrdiff_t>(padding[1]) +
+                                static_cast<ptrdiff_t>(kw);
+                            dim_t col = n * H_out * W_out + oh * W_out + ow;
+                            dim_t out_idx = row * out_shape._strides[0] + col * out_shape._strides[1];
+                            if(
+                                h_in >= 0 && h_in < static_cast<ptrdiff_t>(H) &&
+                                w_in >= 0 && w_in < static_cast<ptrdiff_t>(W)
+                            ){
+                                dim_t in_idx =
+                                    n * in_shape._strides[0] +
+                                    c * in_shape._strides[1] +
+                                    static_cast<dim_t>(h_in) * in_shape._strides[2] +
+                                    static_cast<dim_t>(w_in) * in_shape._strides[3];
+                                out[out_idx] = in[in_idx];
+                            }else{
+                                out[out_idx] = 0.0f;
+                            }
+                        }
+                    }
+                }
+            }
         }
-    }while(_increment_odometer(out_coords,out_shape._shapes));
+    }
 }
 
 /*
@@ -460,44 +585,49 @@ void CpuMath::col2im2d(
     std::array<std::size_t,2> strides,
     std::array<std::size_t,2> padding
 ){
-    //Out should be zeroed
-    //Dimensionality safeguard 
     assert(in_shape.n_dim == 2 && out_shape.n_dim == 4);
     
     using dim_t = std::size_t;
-    
-    //Compute the original height and width of the output (as if it was a normal window-sliding operation)
+
+    std::fill(out, out + out_shape.n_elements, 0.0f);
+
     dim_t N = out_shape[0], C = out_shape[1], H = out_shape[2], W = out_shape[3];
-    
     dim_t H_window = window_shape[0], W_window = window_shape[1];
-    
     dim_t H_in = (H + 2 * padding[0] - H_window) / strides[0] + 1;
     dim_t W_in = (W + 2 * padding[1] - W_window) / strides[1] + 1;
-    //Iterate over the out array
-    std::vector<std::size_t> in_coords(in_shape.n_dim,0);
-    //For each index in the output matrix
-    do{
-        //Compute what element in the input tensor corresponds to this index
-        dim_t rows = in_coords[0], cols = in_coords[1];
-        dim_t delta_w = rows % W_window;
-        dim_t delta_h = (rows/W_window) % H_window;
-        dim_t c = rows / (H_window * W_window);
-        dim_t w_in = cols % W_in;
-        dim_t h_in = (cols/W_in) % H_in;
-        dim_t n = cols / (H_in * W_in);
-        ptrdiff_t h_out_signed = (ptrdiff_t)h_in * (ptrdiff_t)strides[0] - (ptrdiff_t)padding[0] + (ptrdiff_t)delta_h;
-        ptrdiff_t w_out_signed = (ptrdiff_t)w_in * (ptrdiff_t)strides[1] - (ptrdiff_t)padding[1] + (ptrdiff_t)delta_w;
-        dim_t in_idx = _compute_idx_from_coords(in_coords,in_shape._strides);
-        if(
-            h_out_signed>= 0 && h_out_signed < (ptrdiff_t)H && 
-            w_out_signed >= 0 && w_out_signed < (ptrdiff_t)W
-         ){
-            std::size_t h_out = h_out_signed;
-            std::size_t w_out = w_out_signed;
-            dim_t out_idx = _compute_idx_from_coords( std::vector<std::size_t> {n,c,h_out,w_out}, out_shape._strides);
-            out[out_idx] += in[in_idx];
+
+    for(dim_t c = 0; c < C; ++c){
+        for(dim_t kh = 0; kh < H_window; ++kh){
+            for(dim_t kw = 0; kw < W_window; ++kw){
+                dim_t row = (c * H_window + kh) * W_window + kw;
+                for(dim_t n = 0; n < N; ++n){
+                    for(dim_t ih = 0; ih < H_in; ++ih){
+                        ptrdiff_t h_out = static_cast<ptrdiff_t>(ih * strides[0]) -
+                            static_cast<ptrdiff_t>(padding[0]) +
+                            static_cast<ptrdiff_t>(kh);
+                        for(dim_t iw = 0; iw < W_in; ++iw){
+                            ptrdiff_t w_out = static_cast<ptrdiff_t>(iw * strides[1]) -
+                                static_cast<ptrdiff_t>(padding[1]) +
+                                static_cast<ptrdiff_t>(kw);
+                            if(
+                                h_out >= 0 && h_out < static_cast<ptrdiff_t>(H) &&
+                                w_out >= 0 && w_out < static_cast<ptrdiff_t>(W)
+                            ){
+                                dim_t col = n * H_in * W_in + ih * W_in + iw;
+                                dim_t in_idx = row * in_shape._strides[0] + col * in_shape._strides[1];
+                                dim_t out_idx =
+                                    n * out_shape._strides[0] +
+                                    c * out_shape._strides[1] +
+                                    static_cast<dim_t>(h_out) * out_shape._strides[2] +
+                                    static_cast<dim_t>(w_out) * out_shape._strides[3];
+                                out[out_idx] += in[in_idx];
+                            }
+                        }
+                    }
+                }
+            }
         }
-    }while(_increment_odometer(in_coords,in_shape._shapes));
+    }
 
 }
 
@@ -575,6 +705,35 @@ void CpuMath::softmax(
     Shape out_shape
 ) {
     assert(out_shape == a_shape);
+    if(a_shape.n_dim == 2 && _is_contiguous(a_shape) && _is_contiguous(out_shape)){
+        std::size_t rows = a_shape[0];
+        std::size_t cols = a_shape[1];
+
+        for(std::size_t row = 0; row < rows; ++row){
+            const float* a_row = a + row * cols;
+            float* out_row = out + row * cols;
+            float max = std::numeric_limits<float>::lowest();
+
+            for(std::size_t col = 0; col < cols; ++col){
+                if(a_row[col] > max){
+                    max = a_row[col];
+                }
+            }
+
+            float sum = 0.0f;
+            for(std::size_t col = 0; col < cols; ++col){
+                float value = std::exp(a_row[col] - max);
+                out_row[col] = value;
+                sum += value;
+            }
+
+            for(std::size_t col = 0; col < cols; ++col){
+                out_row[col] /= sum;
+            }
+        }
+        return;
+    }
+
     std::vector<std::size_t> out_coords(out_shape.n_dim,0);
     std::size_t last_dim = out_shape._shapes[out_shape.n_dim-1];
     std::size_t a_last_stride = a_shape._strides[out_shape.n_dim-1];
@@ -674,19 +833,35 @@ void CpuMath::max_pooling2D(
     std::vector<std::size_t> patch_coords(2,0);
     std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
 
+    std::fill(mask, mask + mask_shape.n_elements, 0.0f);
+
     do{
         std::fill(patch_coords.begin(),patch_coords.end(),0);
         float max_value = std::numeric_limits<float>::lowest();
         std::size_t max_value_idx = 0;
         do{
             //Compute the coordinates of the input tensor
-            std::size_t in_h = out_coords[2] * strides[0] - padding[0] + patch_coords[0];
-            std::size_t in_w = out_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t idx =  _compute_idx_from_coords(std::vector<std::size_t>{out_coords[0],out_coords[1], in_h, in_w},input_shape._strides);
+            ptrdiff_t in_h = static_cast<ptrdiff_t>(out_coords[2] * strides[0]) -
+                static_cast<ptrdiff_t>(padding[0]) +
+                static_cast<ptrdiff_t>(patch_coords[0]);
+            ptrdiff_t in_w = static_cast<ptrdiff_t>(out_coords[3] * strides[1]) -
+                static_cast<ptrdiff_t>(padding[1]) +
+                static_cast<ptrdiff_t>(patch_coords[1]);
             //If the computed coordinates are not in the padding region, compare the actual value
-            if( in_h < input_shape[2] && in_h >= 0 && in_w >= 0 && in_w < input_shape[3]){
+            if(
+                in_h >= 0 && in_h < static_cast<ptrdiff_t>(input_shape[2]) &&
+                in_w >= 0 && in_w < static_cast<ptrdiff_t>(input_shape[3])
+            ){
+                std::size_t idx =  _compute_idx_from_coords(
+                    std::vector<std::size_t>{
+                        out_coords[0],
+                        out_coords[1],
+                        static_cast<std::size_t>(in_h),
+                        static_cast<std::size_t>(in_w)
+                    },
+                    input_shape._strides
+                );
                 float value = input[idx];
-                mask[idx] = 0.0f;
                 if( max_value < value ){
                     max_value = value;
                     max_value_idx = idx;
@@ -722,20 +897,35 @@ void CpuMath::inv_max_pooling2D(
     std::vector<std::size_t> patch_coords(2,0);
     std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};   // Channel, Height, Width
 
+    std::fill(out, out + out_shape.n_elements, 0.0f);
+
     do{
         std::fill(patch_coords.begin(),patch_coords.end(),0);
         do{
             //Compute the coordinates of the output tensor
-            std::size_t out_h = pool_coords[2] * strides[0] - padding[0] + patch_coords[0];
-            std::size_t out_w = pool_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t out_idx =  _compute_idx_from_coords(std::vector<std::size_t>{pool_coords[0],pool_coords[1], out_h, out_w},out_shape._strides);
+            ptrdiff_t out_h = static_cast<ptrdiff_t>(pool_coords[2] * strides[0]) -
+                static_cast<ptrdiff_t>(padding[0]) +
+                static_cast<ptrdiff_t>(patch_coords[0]);
+            ptrdiff_t out_w = static_cast<ptrdiff_t>(pool_coords[3] * strides[1]) -
+                static_cast<ptrdiff_t>(padding[1]) +
+                static_cast<ptrdiff_t>(patch_coords[1]);
             //If the computed coordinates are not in the padding region, compare the actual value
-            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+            if(
+                out_h >= 0 && out_h < static_cast<ptrdiff_t>(out_shape[2]) &&
+                out_w >= 0 && out_w < static_cast<ptrdiff_t>(out_shape[3])
+            ){
+                std::size_t out_idx =  _compute_idx_from_coords(
+                    std::vector<std::size_t>{
+                        pool_coords[0],
+                        pool_coords[1],
+                        static_cast<std::size_t>(out_h),
+                        static_cast<std::size_t>(out_w)
+                    },
+                    out_shape._strides
+                );
                 if(mask[out_idx] == 1){
                     std::size_t pooled_idx = _compute_idx_from_coords(pool_coords,max_pooled_shape._strides);
                     out[out_idx] = max_pooled[pooled_idx];
-                }else{
-                    out[out_idx] = 0;
                 }
             }
         }while(_increment_odometer(patch_coords,patch_shapes));
@@ -806,19 +996,35 @@ void CpuMath::inv_avg_pooling2D(
     //Now starts the logic
     std::vector<std::size_t> pooled_coords(avg_pooled_shape.n_dim,0);
     std::vector<std::size_t> patch_coords(2,0);
+    std::array<std::size_t, TENSOR_MAX_DIM> patch_shapes = {window_shapes[0],window_shapes[1]};
     std::size_t window_n_elements = window_shapes[0] * window_shapes[1];
     do{
         std::size_t pooled_idx = _compute_idx_from_coords(pooled_coords,avg_pooled_shape._strides);
         float to_add = avg_pooled[pooled_idx]/window_n_elements;
         std::fill(patch_coords.begin(),patch_coords.end(),0);
         do{
-            std::size_t out_h = pooled_coords[2] * strides[0] - padding[0] + patch_coords[0];
-            std::size_t out_w = pooled_coords[3] * strides[1] - padding[1] + patch_coords[1];
-            std::size_t out_idx =  _compute_idx_from_coords(std::vector<std::size_t>{pooled_coords[0],pooled_coords[1], out_h, out_w},out_shape._strides);
-            if( out_h < out_shape[2] && out_h >= 0 && out_w >= 0 && out_w < out_shape[3]){
+            ptrdiff_t out_h = static_cast<ptrdiff_t>(pooled_coords[2] * strides[0]) -
+                static_cast<ptrdiff_t>(padding[0]) +
+                static_cast<ptrdiff_t>(patch_coords[0]);
+            ptrdiff_t out_w = static_cast<ptrdiff_t>(pooled_coords[3] * strides[1]) -
+                static_cast<ptrdiff_t>(padding[1]) +
+                static_cast<ptrdiff_t>(patch_coords[1]);
+            if(
+                out_h >= 0 && out_h < static_cast<ptrdiff_t>(out_shape[2]) &&
+                out_w >= 0 && out_w < static_cast<ptrdiff_t>(out_shape[3])
+            ){
+                std::size_t out_idx =  _compute_idx_from_coords(
+                    std::vector<std::size_t>{
+                        pooled_coords[0],
+                        pooled_coords[1],
+                        static_cast<std::size_t>(out_h),
+                        static_cast<std::size_t>(out_w)
+                    },
+                    out_shape._strides
+                );
                 out[out_idx] += to_add;
             }
-        }while(_increment_odometer(patch_coords,out_shape._shapes));
+        }while(_increment_odometer(patch_coords,patch_shapes));
     }while(_increment_odometer(pooled_coords,avg_pooled_shape._shapes));
     return;
 }
@@ -944,6 +1150,30 @@ void CpuMath::mean(
     std::size_t acc_dim = in_shape[axis];
     assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
 
+    if(axis == 1 && in_shape.n_dim == 4 && _is_contiguous(in_shape) && _is_contiguous(out_shape)){
+        std::fill(out, out + out_shape[0], 0.0f);
+        std::size_t N = in_shape[0];
+        std::size_t C = in_shape[1];
+        std::size_t HW = in_shape[2] * in_shape[3];
+
+        for(std::size_t n = 0; n < N; ++n){
+            for(std::size_t c = 0; c < C; ++c){
+                const float* src = in + (n * C + c) * HW;
+                float sum = 0.0f;
+                for(std::size_t hw = 0; hw < HW; ++hw){
+                    sum += src[hw];
+                }
+                out[c] += sum;
+            }
+        }
+
+        float M = static_cast<float>(N * HW);
+        for(std::size_t c = 0; c < C; ++c){
+            out[c] /= M;
+        }
+        return;
+    }
+
     //As a safety measure, put zeros on out
     for(std::size_t i = 0; i < out_shape[0]; i++){
         out[i] = 0.0f;
@@ -978,6 +1208,37 @@ void CpuMath::variance(
     assert(out_shape.n_dim == 1 && mean_shape.n_dim == 1);
     assert(out_shape[0] == acc_dim && mean_shape[0] == acc_dim);
 
+    if(
+        axis == 1 &&
+        in_shape.n_dim == 4 &&
+        _is_contiguous(in_shape) &&
+        _is_contiguous(out_shape) &&
+        _is_contiguous(mean_shape)
+    ){
+        std::fill(out, out + out_shape[0], 0.0f);
+        std::size_t N = in_shape[0];
+        std::size_t C = in_shape[1];
+        std::size_t HW = in_shape[2] * in_shape[3];
+
+        for(std::size_t n = 0; n < N; ++n){
+            for(std::size_t c = 0; c < C; ++c){
+                const float* src = in + (n * C + c) * HW;
+                float sum = 0.0f;
+                for(std::size_t hw = 0; hw < HW; ++hw){
+                    float diff = src[hw] - mean[c];
+                    sum += diff * diff;
+                }
+                out[c] += sum;
+            }
+        }
+
+        float M = static_cast<float>(N * HW);
+        for(std::size_t c = 0; c < C; ++c){
+            out[c] /= M;
+        }
+        return;
+    }
+
     //As a safety measure, put zeros on out
     for(std::size_t i = 0; i < out_shape[0]; i++){
         out[i] = 0.0f;
@@ -1009,6 +1270,25 @@ void CpuMath::reduce_all(
     assert(axis < in_shape.n_dim);
     std::size_t acc_dim = in_shape[axis];
     assert(out_shape.n_dim == 1 && out_shape[0] == acc_dim);
+
+    if(axis == 1 && in_shape.n_dim == 4 && _is_contiguous(in_shape) && _is_contiguous(out_shape)){
+        std::fill(out, out + out_shape[0], 0.0f);
+        std::size_t N = in_shape[0];
+        std::size_t C = in_shape[1];
+        std::size_t HW = in_shape[2] * in_shape[3];
+
+        for(std::size_t n = 0; n < N; ++n){
+            for(std::size_t c = 0; c < C; ++c){
+                const float* src = in + (n * C + c) * HW;
+                float sum = 0.0f;
+                for(std::size_t hw = 0; hw < HW; ++hw){
+                    sum += src[hw];
+                }
+                out[c] += sum;
+            }
+        }
+        return;
+    }
 
     //As a safety measure, put zeros on out
     for(std::size_t i = 0; i < out_shape[0]; i++){
