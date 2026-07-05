@@ -15,7 +15,7 @@ FullyConnected::FullyConnected(
     if(Shape(shape).n_dim != 2){ throw std::runtime_error("Error: Only valid 2-dimensional shapes"); }
     this->input_dim = shape[0];
     this->output_dim = shape[1];
-    this->_bias_grad = std::make_unique<Tensor>(Tensor({1,this->output_dim},dev,0.0f,true));
+    this->_bias_grad = std::make_unique<Tensor>(std::array<std::size_t,TENSOR_MAX_DIM>{1,this->output_dim},dev,0.0f,true);
 }
 
 std::shared_ptr<Tensor> FullyConnected::forward(const Tensor& in){

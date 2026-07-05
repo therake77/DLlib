@@ -44,7 +44,7 @@ inline void fancy_print(const Tensor& a){
 }
 
 int main(){
-    auto device = DeviceManager::get_cpu_device();
+    auto device = DeviceManager::get_gpu_device();
     Conv2D conv_layer = Conv2D(
         {2,1,3,3},
         device,
@@ -98,38 +98,31 @@ int main(){
         true
     );
     std::cout<<"Input:\n";
-    fancy_print(input);
     //Conv2D
     std::cout<<"Con2D:\n";
     auto result1 = conv_layer.forward(input);
-    fancy_print(*result1);
+
     std::cout<<"BatchNorm:\n";
     auto result2 = batch_layer.forward(*result1);
-    fancy_print(*result2);
     std::cout<<"MaxPool:\n";
     auto result3 = max_pool_layer.forward(*result2);
-    fancy_print(*result3);
     std::cout<<"Flatten:\n";
     auto result4 = flatten_layer.forward(*result3);
-    fancy_print(*result4);
     std::cout<<"Activation1:\n";
     auto result5 = activation.forward(*result4);
-    fancy_print(*result5);
     std::cout<<"FullyConnected1:\n";
     auto result6 = dense1.forward(*result5);
-    fancy_print(*result6);
     std::cout<<"Activation2:\n";
     auto result7 = activation2.forward(*result6);
-    fancy_print(*result7);
     std::cout<<"FullyConnected2:\n";
     auto result8 = dense2.forward(*result7);
-    fancy_print(*result8);
     std::cout<<"Sotfmax+CrossEntropy:\n";
     auto output = out.forward(*result8);
     std::cout<<"Output\n";
-    fancy_print(
-        *output
-    );
+
+
+    Tensor output_cpu = Tensor(*output);
+    fancy_print(output_cpu);
 
     //Now it comes the backward pass
     //Let the label corresponding to the current batch:
@@ -158,7 +151,8 @@ int main(){
     auto backward_grad8 = batch_layer.backward(*backward_grad7,*result1);
     std::cout<<"backward_grad8 passed\n";
     auto backward_grad9 = conv_layer.backward(*backward_grad8,input);
-    fancy_print(
-        *backward_grad9
-    );
+    
+    Tensor backward_cpu = Tensor(*backward_grad9);
+    fancy_print(backward_cpu);
+
 }

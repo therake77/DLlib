@@ -18,7 +18,7 @@ BatchNorm::BatchNorm(
     _sqrt_variances({channel_dim},dev,0.0f,true)
 {
     //The gradient is also a vector of length channel_dim known at instantiation
-    this->_grad = std::make_shared<Tensor>(Tensor({channel_dim},dev,0.0f,true));
+    this->_grad = std::make_shared<Tensor>(std::array<std::size_t,TENSOR_MAX_DIM>{channel_dim},dev,0.0f,true);
 }
 
 std::shared_ptr<Tensor> BatchNorm::forward( 

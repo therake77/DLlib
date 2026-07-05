@@ -42,19 +42,22 @@ Tensor::Tensor(const Tensor& t, const std::shared_ptr<Device> device) : device(d
         throw std::runtime_error("Failed memory allocation");
     }
 
+
     auto src_type = t.getDevice().get()->get_type();
     auto dst_type = this->device->get_type();
 
     size_t _size = shape.n_elements;
 
-    if(src_type == DeviceType::CPU && dst_type == DeviceType::CPU){
-        std::memcpy(data_ptr, t.data(), _size * sizeof(float));
-    }else if(src_type == DeviceType::CPU && dst_type == DeviceType::GPU){
-        this->device->copy_to_device(data_ptr, t.data(), _size * sizeof(float));
-    }else if(src_type == DeviceType::GPU && dst_type == DeviceType::CPU){
-        this->device->copy_to_host(data_ptr, t.data(), _size * sizeof(float));
+    if(src_type == dst_type){
+        this->device->copy_device_to_device(data_ptr,t.data(), _size * sizeof(float));
+    }else if(src_type == DeviceType::GPU){
+        // This device is CPU and the source device is GPU
+        // Then, copy from GPU to CPU
+        t.getDevice()->copy_to_host(data_ptr,t.data(),_size * sizeof(float));
     }else{
-        this->device->copy_device_to_device(data_ptr, t.data(), _size * sizeof(float));
+        // This device is GPU and the source device is CPU
+        // Then, copy from CPU to GPU using the GPU device (this)
+        this->device->copy_to_device(data_ptr,t.data(),_size * sizeof(float));
     }
 
     auto curr_dev = this->device;
@@ -105,7 +108,7 @@ void Tensor::to(std::shared_ptr<Device> device){
 
     if(device->get_type() == DeviceType::CPU){
         //Data is in GPU, copy to CPU
-        device->copy_to_host(data_ptr, this->gpu_data.get(), _size * sizeof(float));
+        this->device->copy_to_host(data_ptr, this->gpu_data.get(), _size * sizeof(float));
         this->cpu_data = std::unique_ptr<void,std::function<void(void*)>>(data_ptr, deleter);
         this->gpu_data.reset();
     }else{

@@ -25,7 +25,7 @@ public:
 
     void __check_initialization(std::shared_ptr<Tensor>& t, Shape s){
         if(t.get() == nullptr){
-            t = std::make_shared<Tensor>(Tensor(s._shapes,this->_dev));
+            t = std::make_shared<Tensor>(s._shapes,this->_dev);
         }else if(t->shape != s){
             t->resize(s);
         }
@@ -34,7 +34,7 @@ public:
 
     void __check_initialization(std::unique_ptr<Tensor>& t, Shape s){
         if(t.get() == nullptr){
-            t = std::make_unique<Tensor>(Tensor(s._shapes,this->_dev));
+            t = std::make_unique<Tensor>(s._shapes,this->_dev);
         }else if(t->shape != s){
             t->resize(s);
         }

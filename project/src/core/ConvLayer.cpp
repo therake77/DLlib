@@ -7,7 +7,7 @@ Conv2D::Conv2D(
     std::shared_ptr<Device> dev,
     std::array<size_t,2> _padding,
     std::array<size_t,2> _strides)
-  : _kernels(kernel_shape,dev,1.0f,true),   //TODO(TEMPORAL, CHANGE THIS)
+  : _kernels(kernel_shape,dev),
     padding(_padding),
     strides(_strides),
     Layer(dev)
