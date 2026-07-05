@@ -131,3 +131,5 @@ if(CMAKE_CUDA_COMPILER)
     target_link_libraries(cnn_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(kernel_test PRIVATE CUDA::cuda_driver)
 endif()
+
+add_subdirectory(benchmarks)
