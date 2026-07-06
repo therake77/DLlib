@@ -6,3 +6,4 @@ datasets/*
 CLAUDE.md
 .claude
 docs/bugs_found.md
+scripts/.venv/

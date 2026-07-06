@@ -216,6 +216,73 @@ Generar salida JSON:
 .\build\benchmarks\Release\cnn_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks/results.json --benchmark_out_format=json
 ```
 
+Flujo recomendado para generar datos reproducibles:
+
+```powershell
+cmake -S . -B build
+cmake --build build --target cnn_benchmark --config Release
+.\build\benchmarks\Release\cnn_benchmark.exe `
+  --benchmark_repetitions=10 `
+  --benchmark_report_aggregates_only=false `
+  --benchmark_format=json `
+  --benchmark_out=benchmarks/results.json `
+  --benchmark_out_format=json
+```
+
+## Analisis y graficas
+
+El script de analisis vive en:
+
+```text
+scripts/analyze_benchmarks.py
+```
+
+Crear el entorno virtual con Python 3.13:
+
+```powershell
+python -m venv scripts\.venv
+```
+
+Instalar dependencias:
+
+```powershell
+scripts\.venv\Scripts\python.exe -m pip install -r scripts\requirements.txt
+```
+
+Analizar el JSON generado por Google Benchmark:
+
+```powershell
+scripts\.venv\Scripts\python.exe scripts\analyze_benchmarks.py benchmarks\results.json --out-dir benchmarks\results\processed
+```
+
+Salidas generadas:
+
+```text
+benchmarks/results/processed/benchmark_rows.csv
+benchmarks/results/processed/speedups_cpu_gpu.csv
+benchmarks/results/processed/figures/
+```
+
+`benchmark_rows.csv` contiene las filas limpias de Google Benchmark. `speedups_cpu_gpu.csv` contiene los pares CPU/GPU y la columna:
+
+```text
+speedup_cpu_over_gpu = cpu_real_time_s / gpu_real_time_s
+```
+
+Las figuras PNG muestran el speedup CPU/GPU por benchmark. Una barra mayor que `1` significa que GPU fue mas rapido que CPU para ese caso. Una barra menor que `1` significa que CPU fue mas rapido que GPU.
+
+Si solo se quieren generar CSV sin figuras:
+
+```powershell
+scripts\.venv\Scripts\python.exe scripts\analyze_benchmarks.py benchmarks\results.json --no-plots
+```
+
+Si se quiere usar la mediana en vez de la media:
+
+```powershell
+scripts\.venv\Scripts\python.exe scripts\analyze_benchmarks.py benchmarks\results.json --aggregate median
+```
+
 ## Criterio para benchmarks end-to-end
 
 Un benchmark end-to-end de CNN CPU vs GPU debe agregarse solo cuando:
@@ -227,3 +294,42 @@ Un benchmark end-to-end de CNN CPU vs GPU debe agregarse solo cuando:
 - el benchmark no depende de impresion por consola ni lectura de archivos dentro del bucle medido.
 
 Hasta entonces, es preferible medir operaciones y capas por separado.
+
+## Benchmarks de red completa
+
+El ejecutable `cnn_benchmark` incluye benchmarks de una CNN tipo MNIST basada en la arquitectura usada por `project/app.cpp`:
+
+```text
+Conv2D -> BatchNorm -> LeakyReLU -> MaxPooling
+Conv2D -> BatchNorm -> LeakyReLU -> MaxPooling
+Flatten -> FullyConnected -> LeakyReLU -> FullyConnected -> OutputLayer
+```
+
+Los benchmarks disponibles son:
+
+```text
+cnn_forward/CPU
+cnn_forward/GPU
+cnn_training_step_same_batch/CPU
+cnn_training_step_same_batch/GPU
+```
+
+`cnn_training_step_same_batch` mide una iteracion completa:
+
+```text
+forward + backward + update_weights
+```
+
+Este benchmark sigue la misma idea del flag `--same-batch` de `project/app.cpp`: el input y los labels se crean una sola vez fuera del bucle de medicion y luego se reutiliza exactamente el mismo batch en cada iteracion. Esto evita mezclar el costo del entrenamiento con variacion de dataset, carga de archivos o avance del indice del batch.
+
+Ejecutar solo estos benchmarks:
+
+```powershell
+.\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_
+```
+
+Ejecutar solo entrenamiento con batch fijo:
+
+```powershell
+.\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_training_step_same_batch
+```
