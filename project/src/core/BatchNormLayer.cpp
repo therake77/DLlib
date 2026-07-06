@@ -8,8 +8,8 @@ BatchNorm::BatchNorm(
     std::size_t channel_dim,
     std::shared_ptr<Device> dev
 ) : Layer(dev),
-    _gamma({channel_dim},dev),
-    _beta({channel_dim},dev),
+    _gamma({channel_dim},dev,1.0f,true),
+    _beta({channel_dim},dev,0.0f,true),
     _beta_grad({channel_dim},dev,0.0f,true),
     _means({channel_dim},dev,0.0f,true),
     _variances({channel_dim},dev,0.0f,true),
@@ -37,7 +37,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor expanded_means = Tensor(this->_running_means,this->_dev);
 
         //Before proceeding with the variances, first cache the value \sqrt(\sigma^2+\epsilon)
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
         TensorMath::add(
             this->_running_variances,
             epsilon,
@@ -96,7 +96,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor& normalized_input = *(this->_normalized_input);
 
         //An epsilon value
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
 
         //Cache \sqrt(\sigma^2+\epsilon) on this->_sqrt_variances: backward() reads this member,
         //so it must be persisted here (not just computed in a local expanded copy), otherwise
@@ -208,8 +208,8 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     //Now compute the gradient to pass backwards
     //To do so, we need to expand the gradients to match the expected layout
 
-    //Now that every tensor has the same dimension, we proceed
-    //compute dL/dX = (\gamma / M) . 1/\sqrt(\sigma^2 + \epsilon) . (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
+    //Now that every tensor has the same dimension, we proceed.
+    //dX = (gamma / sqrt(var + eps)) * (M*dY - dBeta - xHat*dGamma) / M
     float M = total_elements/channel_dim;
     //Create copies to expand in the formula
     //In the formula appears and needs to be expanded: gamma, _sqrt_variances, _beta_grad, _gamma_grad
@@ -219,25 +219,30 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     Tensor expanded_gamma = Tensor(_gamma,this->_dev);
 
     expanded_grad_beta.unsqueeze(0);
-    expanded_grad_gamma.unsqueeze(0),
+    expanded_grad_gamma.unsqueeze(0);
     expanded_sqrt_variances.unsqueeze(0);
     expanded_gamma.unsqueeze(0);
     expanded_grad_beta.inner_expand(n_dim);
-    expanded_grad_gamma.inner_expand(n_dim),
+    expanded_grad_gamma.inner_expand(n_dim);
     expanded_sqrt_variances.inner_expand(n_dim);
     expanded_gamma.inner_expand(n_dim);
 
-    //Now that all are well expanded, compute (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
-    //In two steps. First M . dL/dY . dL/d\beta saved in _backward_out, and then X_normalized . dL/d\gamma saved in X_normalized
-    // I believe X_normalized is not needed in further procedures after backwards
-    TensorMath::multiply(
+    //First compute M*dY - dBeta into _backward_out.
+    TensorMath::scale(
         backward_grad,
+        M,
+        *(this->_backward_out)
+    );
+    TensorMath::sub(
+        *(this->_backward_out),
         expanded_grad_beta,
         *(this->_backward_out)
     );
+
+    //Then subtract xHat*dGamma. normalized_input is no longer needed after this point.
     TensorMath::multiply(
         normalized_input,
-        expanded_gamma,
+        expanded_grad_gamma,
         normalized_input
     );
     TensorMath::sub(
@@ -260,6 +265,20 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
         *(this->_backward_out),
         1/M,
         *(this->_backward_out)
+    );
+
+    // Keep BatchNorm affine parameter updates independent from spatial size.
+    // The dX formula above needs summed dBeta/dGamma, but gamma/beta updates are
+    // much stabler when averaged over the same reduction domain.
+    TensorMath::scale(
+        _gamma_grad,
+        1/M,
+        _gamma_grad
+    );
+    TensorMath::scale(
+        this->_beta_grad,
+        1/M,
+        this->_beta_grad
     );
     return this->_backward_out;
 }

@@ -6,7 +6,7 @@
 OutputLayer::OutputLayer(
     std::shared_ptr<Device> dev,
     std::size_t logits
-) : _logits(logits) , Layer(dev), _probabilities({1,logits}) { }
+) : _logits(logits) , Layer(dev), _probabilities({1,logits},dev) { }
 
 /*
 Inference forward pass
@@ -30,14 +30,14 @@ std::shared_ptr<Tensor> OutputLayer::forward( const Tensor& in ){
 std::shared_ptr<Tensor> OutputLayer::forward(const Tensor& in, const Tensor& labels){
     if(this->mode == LayerMode::Training){
         std::size_t batchs = in.shape[0];
-        __check_initialization(this->_forward_out,in.shape);
         _probabilities.resize(in.shape);
         TensorMath::softmax(
             in,
             this->_probabilities
         );
 
-        Tensor log_probs {in.shape._shapes,this->_dev};
+        __check_initialization(this->_backward_out, in.shape);
+        Tensor& log_probs = *(this->_backward_out);
 
         TensorMath::log(
             this->_probabilities, //And then, use _forward_out to compute the rest
@@ -80,9 +80,10 @@ std::shared_ptr<Tensor> OutputLayer::backward( const Tensor& labels, const Tenso
         labels,
         *(this->_backward_out)
     );
+    float to_divide = 1.0f/(float)batch;
     TensorMath::scale(
         *(this->_backward_out),
-        1.0f/(float)batch,
+        to_divide,
         *(this->_backward_out)
     );
     return this->_backward_out;
