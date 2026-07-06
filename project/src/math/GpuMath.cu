@@ -735,6 +735,52 @@ namespace LLCN_MATH_KERNELS{
         atomicAdd(&out[out_idx], diff * diff);
     }
 
+    //One thread per row (i.e. per element of every axis except the innermost one).
+    //Mirrors CpuMath::softmax's max-subtraction trick for numerical stability.
+    __global__ void softmax_kernel(
+        const float* in,
+        float* out,
+        GpuShape in_shape,
+        GpuShape out_shape,
+        size_t n_dims,
+        size_t last_dim,
+        size_t total_rows
+    ){
+        size_t row = blockIdx.x * blockDim.x + threadIdx.x;
+        if(row >= total_rows) return;
+
+        //Decode `row` into coords for dims [0, n_dims-2]; the innermost dim is iterated below
+        size_t coords[TENSOR_MAX_DIM];
+        size_t remaining = row;
+        for(size_t i = n_dims - 1; i --> 0; ){
+            coords[i] = remaining % out_shape[i];
+            remaining /= out_shape[i];
+        }
+        coords[n_dims-1] = 0;
+
+        size_t in_base_idx  = _compute_idx_from_coords(coords, in_shape, n_dims);
+        size_t out_base_idx = _compute_idx_from_coords(coords, out_shape, n_dims);
+        size_t in_last_stride  = in_shape.stride(n_dims-1);
+        size_t out_last_stride = out_shape.stride(n_dims-1);
+
+        float max_val = -3.402823466e+38f; // -FLT_MAX
+        for(size_t i = 0; i < last_dim; i++){
+            float v = in[in_base_idx + i*in_last_stride];
+            if(v > max_val) max_val = v;
+        }
+
+        float sum = 0.0f;
+        for(size_t i = 0; i < last_dim; i++){
+            float v = expf(in[in_base_idx + i*in_last_stride] - max_val);
+            out[out_base_idx + i*out_last_stride] = v;
+            sum += v;
+        }
+
+        for(size_t i = 0; i < last_dim; i++){
+            out[out_base_idx + i*out_last_stride] /= sum;
+        }
+    }
+
 
 };
 
@@ -1131,11 +1177,32 @@ void GpuMath::tanh(const float* a, float* out, size_t n_elements) {
 
 void GpuMath::softmax(
     const float* a,
-    Shape a_shape, 
+    Shape a_shape,
     float* out,
     Shape out_shape
 ) {
+    using namespace LLCN_MATH_KERNELS;
+    GpuShape g_a   = GpuShape::from_shape(a_shape);
+    GpuShape g_out = GpuShape::from_shape(out_shape);
 
+    size_t n_dims    = out_shape.n_dim;
+    size_t last_dim  = g_out[n_dims-1];
+    size_t total_rows = out_shape.n_elements / last_dim;
+
+    size_t block_size = 256;
+    size_t grid_size  = (total_rows + block_size - 1) / block_size;
+
+    softmax_kernel<<<grid_size, block_size>>>(
+        a, out,
+        g_a, g_out,
+        n_dims, last_dim, total_rows
+    );
+
+    auto status_code = cudaDeviceSynchronize();
+    if(status_code != cudaSuccess){
+        throw std::runtime_error("Error: softmax kernel execution failed");
+    }
+    return;
 }
     
 

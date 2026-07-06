@@ -3,7 +3,8 @@
 
 enum class ActivationTypes{
     ReLU,
-    Sigmoid
+    Sigmoid,
+    LeakyReLU
 };
 
 class ActivationLayer : public Layer{

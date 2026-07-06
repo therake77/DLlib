@@ -8,8 +8,8 @@ BatchNorm::BatchNorm(
     std::size_t channel_dim,
     std::shared_ptr<Device> dev
 ) : Layer(dev),
-    _gamma({channel_dim},dev),
-    _beta({channel_dim},dev),
+    _gamma({channel_dim},dev,1.0f,true),
+    _beta({channel_dim},dev,0.0f,true),
     _beta_grad({channel_dim},dev,0.0f,true),
     _means({channel_dim},dev,0.0f,true),
     _variances({channel_dim},dev,0.0f,true),
@@ -37,7 +37,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor expanded_means = Tensor(this->_running_means,this->_dev);
 
         //Before proceeding with the variances, first cache the value \sqrt(\sigma^2+\epsilon)
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
         TensorMath::add(
             this->_running_variances,
             epsilon,
@@ -96,7 +96,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor& normalized_input = *(this->_normalized_input);
 
         //An epsilon value
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
 
         //Cache \sqrt(\sigma^2+\epsilon) on this->_sqrt_variances: backward() reads this member,
         //so it must be persisted here (not just computed in a local expanded copy), otherwise
@@ -227,17 +227,22 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     expanded_sqrt_variances.inner_expand(n_dim);
     expanded_gamma.inner_expand(n_dim);
 
-    //Now that all are well expanded, compute (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
-    //In two steps. First M . dL/dY . dL/d\beta saved in _backward_out, and then X_normalized . dL/d\gamma saved in X_normalized
+    //Now that all are well expanded, compute (M . dL/dY - dL/d\beta - X_normalized . dL/d\gamma )
+    //In two steps. First M . dL/dY - dL/d\beta saved in _backward_out, and then X_normalized . dL/d\gamma saved in X_normalized
     // I believe X_normalized is not needed in further procedures after backwards
-    TensorMath::multiply(
+    TensorMath::scale(
         backward_grad,
+        M,
+        *(this->_backward_out)
+    );
+    TensorMath::sub(
+        *(this->_backward_out),
         expanded_grad_beta,
         *(this->_backward_out)
     );
     TensorMath::multiply(
         normalized_input,
-        expanded_gamma,
+        expanded_grad_gamma,
         normalized_input
     );
     TensorMath::sub(

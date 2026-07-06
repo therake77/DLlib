@@ -6,7 +6,7 @@
 OutputLayer::OutputLayer(
     std::shared_ptr<Device> dev,
     std::size_t logits
-) : _logits(logits) , Layer(dev), _probabilities({1,logits}) { }
+) : _logits(logits) , Layer(dev), _probabilities({1,logits},dev) { }
 
 /*
 Inference forward pass
@@ -80,9 +80,10 @@ std::shared_ptr<Tensor> OutputLayer::backward( const Tensor& labels, const Tenso
         labels,
         *(this->_backward_out)
     );
+    float to_divide = 1.0f/(float)batch;
     TensorMath::scale(
         *(this->_backward_out),
-        1.0f/(float)batch,
+        to_divide,
         *(this->_backward_out)
     );
     return this->_backward_out;
