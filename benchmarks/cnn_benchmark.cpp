@@ -55,7 +55,7 @@ Tensor make_one_hot_labels(
     return Tensor({batch, classes, 0, 0}, labels.data(), device);
 }
 
-ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device) {
+ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device, bool use_batchnorm = true) {
     std::vector<std::unique_ptr<Layer>> layers;
 
     layers.push_back(std::make_unique<Conv2D>(
@@ -64,7 +64,9 @@ ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device)
         std::array<std::size_t, 2>{0, 0},
         std::array<std::size_t, 2>{1, 1}
     ));
-    layers.push_back(std::make_unique<BatchNorm>(32, device));
+    if(use_batchnorm) {
+        layers.push_back(std::make_unique<BatchNorm>(32, device));
+    }
     layers.push_back(std::make_unique<ActivationLayer>(ActivationTypes::LeakyReLU, device));
     layers.push_back(std::make_unique<MaxPooling>(
         std::array<std::size_t, 2>{2, 2},
@@ -79,7 +81,9 @@ ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device)
         std::array<std::size_t, 2>{0, 0},
         std::array<std::size_t, 2>{1, 1}
     ));
-    layers.push_back(std::make_unique<BatchNorm>(64, device));
+    if(use_batchnorm) {
+        layers.push_back(std::make_unique<BatchNorm>(64, device));
+    }
     layers.push_back(std::make_unique<ActivationLayer>(ActivationTypes::LeakyReLU, device));
     layers.push_back(std::make_unique<MaxPooling>(
         std::array<std::size_t, 2>{2, 2},
@@ -232,12 +236,12 @@ void fully_connected_forward(benchmark::State& state, BenchDevice bench_device) 
     set_common_counters(state, bench_device, output_elements);
 }
 
-void cnn_forward(benchmark::State& state, BenchDevice bench_device) {
+void cnn_forward(benchmark::State& state, BenchDevice bench_device, bool use_batchnorm) {
     std::size_t batch = static_cast<std::size_t>(state.range(0));
     auto device = make_device(bench_device);
 
     Tensor input({batch, 1, 28, 28}, device);
-    auto cnn = make_mnist_cnn(device);
+    auto cnn = make_mnist_cnn(device, use_batchnorm);
     cnn.set_mode(LayerMode::Inference);
 
     auto warmup = cnn.forward(input);
@@ -256,13 +260,13 @@ void cnn_forward(benchmark::State& state, BenchDevice bench_device) {
     set_common_counters(state, bench_device, batch * 10);
 }
 
-void cnn_training_step_same_batch(benchmark::State& state, BenchDevice bench_device) {
+void cnn_training_step_same_batch(benchmark::State& state, BenchDevice bench_device, bool use_batchnorm) {
     std::size_t batch = static_cast<std::size_t>(state.range(0));
     auto device = make_device(bench_device);
 
     Tensor input({batch, 1, 28, 28}, device);
     Tensor labels = make_one_hot_labels(batch, 10, device);
-    auto cnn = make_mnist_cnn(device);
+    auto cnn = make_mnist_cnn(device, use_batchnorm);
     cnn.set_mode(LayerMode::Training);
 
     constexpr float learning_rate = -0.01f;
@@ -305,11 +309,19 @@ void fully_connected_forward_cpu(benchmark::State& state) {
 }
 
 void cnn_forward_cpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::CPU);
+    cnn_forward(state, BenchDevice::CPU, true);
+}
+
+void cnn_forward_no_batchnorm_cpu(benchmark::State& state) {
+    cnn_forward(state, BenchDevice::CPU, false);
 }
 
 void cnn_training_step_same_batch_cpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::CPU);
+    cnn_training_step_same_batch(state, BenchDevice::CPU, true);
+}
+
+void cnn_training_step_same_batch_no_batchnorm_cpu(benchmark::State& state) {
+    cnn_training_step_same_batch(state, BenchDevice::CPU, false);
 }
 
 #ifdef __USE_CUDA__
@@ -330,11 +342,19 @@ void fully_connected_forward_gpu(benchmark::State& state) {
 }
 
 void cnn_forward_gpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::GPU);
+    cnn_forward(state, BenchDevice::GPU, true);
+}
+
+void cnn_forward_no_batchnorm_gpu(benchmark::State& state) {
+    cnn_forward(state, BenchDevice::GPU, false);
 }
 
 void cnn_training_step_same_batch_gpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::GPU);
+    cnn_training_step_same_batch(state, BenchDevice::GPU, true);
+}
+
+void cnn_training_step_same_batch_no_batchnorm_gpu(benchmark::State& state) {
+    cnn_training_step_same_batch(state, BenchDevice::GPU, false);
 }
 #endif
 
@@ -369,8 +389,18 @@ BENCHMARK(cnn_forward_cpu)
     ->Arg(1)
     ->Arg(8);
 
+BENCHMARK(cnn_forward_no_batchnorm_cpu)
+    ->Name("cnn_forward_no_batchnorm/CPU")
+    ->Arg(1)
+    ->Arg(8);
+
 BENCHMARK(cnn_training_step_same_batch_cpu)
     ->Name("cnn_training_step_same_batch/CPU")
+    ->Arg(1)
+    ->Arg(8);
+
+BENCHMARK(cnn_training_step_same_batch_no_batchnorm_cpu)
+    ->Name("cnn_training_step_same_batch_no_batchnorm/CPU")
     ->Arg(1)
     ->Arg(8);
 
@@ -404,8 +434,18 @@ BENCHMARK(cnn_forward_gpu)
     ->Arg(1)
     ->Arg(8);
 
+BENCHMARK(cnn_forward_no_batchnorm_gpu)
+    ->Name("cnn_forward_no_batchnorm/GPU")
+    ->Arg(1)
+    ->Arg(8);
+
 BENCHMARK(cnn_training_step_same_batch_gpu)
     ->Name("cnn_training_step_same_batch/GPU")
+    ->Arg(1)
+    ->Arg(8);
+
+BENCHMARK(cnn_training_step_same_batch_no_batchnorm_gpu)
+    ->Name("cnn_training_step_same_batch_no_batchnorm/GPU")
     ->Arg(1)
     ->Arg(8);
 #endif
