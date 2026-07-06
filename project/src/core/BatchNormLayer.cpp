@@ -266,6 +266,20 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
         1/M,
         *(this->_backward_out)
     );
+
+    // Keep BatchNorm affine parameter updates independent from spatial size.
+    // The dX formula above needs summed dBeta/dGamma, but gamma/beta updates are
+    // much stabler when averaged over the same reduction domain.
+    TensorMath::scale(
+        _gamma_grad,
+        1/M,
+        _gamma_grad
+    );
+    TensorMath::scale(
+        this->_beta_grad,
+        1/M,
+        this->_beta_grad
+    );
     return this->_backward_out;
 }
 
