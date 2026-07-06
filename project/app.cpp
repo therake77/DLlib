@@ -1,16 +1,49 @@
 #include <Llcnn.hpp>
 #include <filesystem>
 #include <cstddef>
+#include <string>
+#include <limits>
+#include <stdexcept>
 #define ADD_LAYER(v, LayerType, ...) v.push_back(std::make_unique<LayerType>(__VA_ARGS__))
 
 
 namespace fs = std::filesystem;
 
 
-int main(){
-    auto dev = DeviceManager::get_gpu_device();
+int main(int argc, char** argv){
+    bool use_gpu = false;
+    std::size_t epoch = 10;
+    std::size_t batch_size = 64;
+    std::size_t n_batchs_per_epoch = 937;
+    float lr = -0.01f;
+    bool same_batch = false;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string mode = argv[i];
+        if (mode == "--gpu" || mode == "gpu") {
+            use_gpu = true;
+        } else if (mode == "--cpu" || mode == "cpu") {
+            use_gpu = false;
+        } else if (mode == "--epochs" && i + 1 < argc) {
+            epoch = std::stoull(argv[++i]);
+        } else if (mode == "--batches" && i + 1 < argc) {
+            n_batchs_per_epoch = std::stoull(argv[++i]);
+        } else if (mode == "--batch-size" && i + 1 < argc) {
+            batch_size = std::stoull(argv[++i]);
+        } else if (mode == "--lr" && i + 1 < argc) {
+            lr = std::stof(argv[++i]);
+        } else if (mode == "--same-batch") {
+            same_batch = true;
+        } else {
+            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch]" << std::endl;
+            return 1;
+        }
+    }
+
+    auto dev = use_gpu ? DeviceManager::get_gpu_device() : DeviceManager::get_cpu_device();
     auto cpu_dev = DeviceManager::get_cpu_device();
-    fs::path root = "C:\\Users\\USER\\Documents\\llcnn\\datasets\\mnist\\flat";
+    std::cout << "Device: " << (use_gpu ? "GPU" : "CPU") << std::endl;
+    fs::path root = "datasets/mnist/flat";
     std::cout << root<< std::endl;
     fs::path train_images = root / "train_images_float32.bin";
     fs::path train_labels = root / "train_labels_uint8.bin";
@@ -24,13 +57,13 @@ int main(){
         std::array<std::size_t,2>{1,1}
     );
     ADD_LAYER(
-        layers,ActivationLayer,
-        ActivationTypes::ReLU,
-        dev
-    );
-    ADD_LAYER(
         layers,BatchNorm,
         32,dev
+    );
+    ADD_LAYER(
+        layers,ActivationLayer,
+        ActivationTypes::LeakyReLU,
+        dev
     );
     ADD_LAYER(
         layers,MaxPooling,
@@ -43,17 +76,17 @@ int main(){
         layers, Conv2D, 
         std::array<std::size_t,4>{64,32,3,3},
         dev,
-        std::array<std::size_t,2>{0,0},
+        std::array<std::size_t, 2>{0,0},
         std::array<std::size_t,2>{1,1}
-    );
-    ADD_LAYER(
-        layers,ActivationLayer,
-        ActivationTypes::ReLU,
-        dev
     );
     ADD_LAYER(
         layers,BatchNorm,
         64,dev
+    );
+    ADD_LAYER(
+        layers,ActivationLayer,
+        ActivationTypes::LeakyReLU,
+        dev
     );
     ADD_LAYER(
         layers,MaxPooling,
@@ -73,7 +106,7 @@ int main(){
     );
     ADD_LAYER(
         layers,ActivationLayer,
-        ActivationTypes::ReLU,
+        ActivationTypes::LeakyReLU,
         dev
     );
     ADD_LAYER(
@@ -101,7 +134,7 @@ int main(){
         28,
         28,
         10,
-        DeviceManager::get_cpu_device()
+        dev
     );
 
     /*
@@ -110,27 +143,21 @@ int main(){
     */
     cnn.set_random_weights();
     cnn.set_mode(LayerMode::Training);
-    std::size_t epoch = 10;
     //Negative sign because every layer's update_weight() applies param += lr*grad (ascent),
     //so this flips it into a descent step. TODO: fix the sign at the source in each update_weight().
-    float lr = -0.01;
-    Tensor delta = Tensor({1},dev);
+    Tensor delta = Tensor({1}, dev, 0.0f, true);
     std::size_t curr_index = 0;
-    std::size_t batch_size = 64;
-    std::size_t n_batchs_per_epoch = 937;
     do{
         std::cout<<"Epoch: "<<std::to_string(epoch)<<std::endl;
         
         std::size_t counter = 0;
         do{
-            delta.to(dev);
             std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
-            Tensor input = dataset.load_batch_cpu(curr_index,batch_size);
-            Tensor labels = dataset.labels_one_hot_cpu(curr_index,batch_size);
-            input.to(dev);
-            labels.to(dev);
+            Tensor input = dataset.load_batch(curr_index,batch_size);
+            Tensor labels = dataset.labels_one_hot(curr_index,batch_size);
             /*Result contains a (N,) vector of errors*/
             auto errors = cnn.forward(input,labels);
+            delta.zeros();
             TensorMath::sum(
                 *errors,
                 0,
@@ -141,14 +168,19 @@ int main(){
                 1.0/(float)batch_size,
                 delta
             );
-            std::cout<<"Error"<<std::endl;
-            delta.to(cpu_dev);
-            fancy_print(delta);
+
+            /*Now delta has the error*/
+            Tensor delta_cpu(delta, cpu_dev);
+            std::cout<<"Loss: "<<delta_cpu.data()[0]<<std::endl;
 
             cnn.backward(input,labels);
             cnn.update_weights(lr);
-            curr_index += batch_size;
-            curr_index%=dataset.size();
+            if (same_batch) {
+                curr_index = 0;
+            } else {
+                curr_index += batch_size;
+                curr_index%=dataset.size();
+            }
             counter++;
         }while(counter < n_batchs_per_epoch);
         epoch--;

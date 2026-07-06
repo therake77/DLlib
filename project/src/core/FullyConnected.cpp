@@ -11,7 +11,7 @@
 FullyConnected::FullyConnected(
     std::array<size_t, TENSOR_MAX_DIM> shape,
     std::shared_ptr<Device> dev
-) : _weights(shape,dev),_bias({1,shape[1]},dev), Layer(dev) {
+) : _weights(shape,dev),_bias({1,shape[1]},dev,0.0f,true), Layer(dev) {
     if(Shape(shape).n_dim != 2){ throw std::runtime_error("Error: Only valid 2-dimensional shapes"); }
     this->input_dim = shape[0];
     this->output_dim = shape[1];
@@ -101,5 +101,5 @@ void FullyConnected::he_initialization(){
     std::size_t fan_in = this->input_dim;
     float std_dev = std::sqrt(2.0f/(float)fan_in);
     this->_weights.normal_rand(0.0f,std_dev);
-    this->_bias.normal_rand(0.0f,std_dev);
+    this->_bias.zeros();
 }

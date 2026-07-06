@@ -64,16 +64,24 @@ Shape Shape::unsqueeze(std::size_t axis){
     if( this->n_dim == TENSOR_MAX_DIM) throw std::runtime_error("Impossible to add more dimensions");
     if( axis > this->n_dim){ throw std::runtime_error("Invalid axis"); }
     std::array<std::size_t, TENSOR_MAX_DIM> new_shape {};
+    std::array<std::size_t, TENSOR_MAX_DIM> new_strides {};
 
     for(std::size_t i = 0 ; i < axis; i++){
         new_shape[i] = this->_shapes[i];
+        new_strides[i] = this->_strides[i];
     }
     new_shape[axis] = 1;
+    new_strides[axis] = 0;
     for(std::size_t i = axis + 1; i < TENSOR_MAX_DIM ; i++ ){
         new_shape[i] = this->_shapes[i-1];
+        new_strides[i] = this->_strides[i-1];
     }
 
-    return Shape(new_shape);
+    Shape out(new_shape);
+    out._strides = new_strides;
+    out.n_elements = this->n_elements;
+    out.n_dim = this->n_dim + 1;
+    return out;
 }
 
 void Shape::transpose(){
@@ -102,6 +110,15 @@ void Shape::transpose(std::size_t index1,std::size_t index2){
 void Shape::inner_pad(std::size_t dim){
     if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
     if( dim == n_dim){ return; }
+    if(dim > n_dim){
+        for(std::size_t i = n_dim; i < dim; ++i){
+            this->_shapes[i] = 1;
+            this->_strides[i] = 0;
+        }
+        this->n_dim = dim;
+        return;
+    }
+
     std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
     std::fill(new_shapes.begin(),new_shapes.begin()+dim,1);
     std::size_t i = 0;  
@@ -119,6 +136,23 @@ void Shape::inner_pad(std::size_t dim){
 void Shape::outer_pad(std::size_t dim){
     if(dim > TENSOR_MAX_DIM){ throw std::runtime_error("Error: Impossible to expand"); }
     if( dim == n_dim){ return; }
+    if(dim > n_dim){
+        std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
+        std::array<std::size_t, TENSOR_MAX_DIM> new_strides {};
+        std::fill(new_shapes.begin(), new_shapes.begin() + dim, 1);
+
+        std::size_t offset = dim - n_dim;
+        for(std::size_t i = 0; i < n_dim; ++i){
+            new_shapes[offset + i] = this->_shapes[i];
+            new_strides[offset + i] = this->_strides[i];
+        }
+
+        this->_shapes = new_shapes;
+        this->_strides = new_strides;
+        this->n_dim = dim;
+        return;
+    }
+
     std::array<std::size_t, TENSOR_MAX_DIM> new_shapes {};
     std::fill(new_shapes.begin(),new_shapes.begin()+dim,1);
     std::size_t i = dim;  

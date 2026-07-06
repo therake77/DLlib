@@ -203,6 +203,7 @@ namespace LLCN_MATH_KERNELS{
         size_t in_1_idx = _compute_idx_from_coords(coords,in_1_shape,n_dims);
         size_t in_2_idx = _compute_idx_from_coords(coords,in_2_shape,n_dims);
         size_t out_idx = _compute_idx_from_coords(coords,out_shape,n_dims);
+        out[out_idx] = in_1[in_1_idx] / in_2[in_2_idx];
     };
 
     __global__ void sqrt_kernel(
@@ -259,6 +260,38 @@ namespace LLCN_MATH_KERNELS{
         size_t out_idx = _compute_idx_from_coords(coords,out_shape,n_dims);
         //Clamp away from zero: log(0) is -inf, and -inf * 0 (e.g. one-hot labels) is NaN
         out[out_idx] = log(fmaxf(in[in_idx], FLT_MIN));
+    };
+
+    __global__ void softmax_2d_kernel(
+        const float* in,
+        const GpuShape in_shape,
+        float* out,
+        const GpuShape out_shape,
+        size_t rows,
+        size_t cols
+    ){
+        size_t row = blockIdx.x * blockDim.x + threadIdx.x;
+        if(row >= rows) return;
+
+        float max_value = -FLT_MAX;
+        for(size_t col = 0; col < cols; ++col){
+            size_t in_idx = row * in_shape.stride(0) + col * in_shape.stride(1);
+            max_value = fmaxf(max_value, in[in_idx]);
+        }
+
+        float sum = 0.0f;
+        for(size_t col = 0; col < cols; ++col){
+            size_t in_idx = row * in_shape.stride(0) + col * in_shape.stride(1);
+            size_t out_idx = row * out_shape.stride(0) + col * out_shape.stride(1);
+            float value = expf(in[in_idx] - max_value);
+            out[out_idx] = value;
+            sum += value;
+        }
+
+        for(size_t col = 0; col < cols; ++col){
+            size_t out_idx = row * out_shape.stride(0) + col * out_shape.stride(1);
+            out[out_idx] /= sum;
+        }
     };
 
     __global__ void reLU_kernel(

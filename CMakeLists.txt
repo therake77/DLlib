@@ -104,6 +104,9 @@ target_link_libraries(pooling_test PRIVATE cnn_lib)
 add_executable(cnn_test tests/cnn_test.cpp)
 target_link_libraries(cnn_test PRIVATE cnn_lib)
 
+add_executable(batch_norm_test tests/batch_norm.cpp)
+target_link_libraries(batch_norm_test PRIVATE cnn_lib)
+
 add_executable(kernel_test tests/kernel_tests.cpp)
 target_link_libraries(kernel_test PRIVATE cnn_lib)
 
