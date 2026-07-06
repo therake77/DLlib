@@ -203,6 +203,7 @@ namespace LLCN_MATH_KERNELS{
         size_t in_1_idx = _compute_idx_from_coords(coords,in_1_shape,n_dims);
         size_t in_2_idx = _compute_idx_from_coords(coords,in_2_shape,n_dims);
         size_t out_idx = _compute_idx_from_coords(coords,out_shape,n_dims);
+        out[out_idx] = in_1[in_1_idx] / in_2[in_2_idx];
     };
 
     __global__ void sqrt_kernel(
@@ -259,6 +260,38 @@ namespace LLCN_MATH_KERNELS{
         size_t out_idx = _compute_idx_from_coords(coords,out_shape,n_dims);
         //Clamp away from zero: log(0) is -inf, and -inf * 0 (e.g. one-hot labels) is NaN
         out[out_idx] = log(fmaxf(in[in_idx], FLT_MIN));
+    };
+
+    __global__ void softmax_2d_kernel(
+        const float* in,
+        const GpuShape in_shape,
+        float* out,
+        const GpuShape out_shape,
+        size_t rows,
+        size_t cols
+    ){
+        size_t row = blockIdx.x * blockDim.x + threadIdx.x;
+        if(row >= rows) return;
+
+        float max_value = -FLT_MAX;
+        for(size_t col = 0; col < cols; ++col){
+            size_t in_idx = row * in_shape.stride(0) + col * in_shape.stride(1);
+            max_value = fmaxf(max_value, in[in_idx]);
+        }
+
+        float sum = 0.0f;
+        for(size_t col = 0; col < cols; ++col){
+            size_t in_idx = row * in_shape.stride(0) + col * in_shape.stride(1);
+            size_t out_idx = row * out_shape.stride(0) + col * out_shape.stride(1);
+            float value = expf(in[in_idx] - max_value);
+            out[out_idx] = value;
+            sum += value;
+        }
+
+        for(size_t col = 0; col < cols; ++col){
+            size_t out_idx = row * out_shape.stride(0) + col * out_shape.stride(1);
+            out[out_idx] /= sum;
+        }
     };
 
     __global__ void reLU_kernel(
@@ -1135,7 +1168,33 @@ void GpuMath::softmax(
     float* out,
     Shape out_shape
 ) {
+    using namespace LLCN_MATH_KERNELS;
+    assert(a_shape == out_shape);
+    if(a_shape.n_dim != 2){
+        throw std::runtime_error("GPU softmax currently expects a 2D tensor");
+    }
 
+    size_t rows = a_shape[0];
+    size_t cols = a_shape[1];
+    GpuShape gpu_a_shape = GpuShape::from_shape(a_shape);
+    GpuShape gpu_out_shape = GpuShape::from_shape(out_shape);
+
+    size_t block_size = 256;
+    size_t grid_size = (rows + block_size - 1) / block_size;
+    softmax_2d_kernel<<<grid_size, block_size>>>(
+        a,
+        gpu_a_shape,
+        out,
+        gpu_out_shape,
+        rows,
+        cols
+    );
+
+    auto status_code = cudaDeviceSynchronize();
+    if(status_code != cudaSuccess){
+        throw std::runtime_error("Error: softmax kernel execution failed");
+    }
+    return;
 }
     
 

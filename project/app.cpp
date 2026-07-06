@@ -1,14 +1,29 @@
 #include <Llcnn.hpp>
 #include <filesystem>
 #include <cstddef>
+#include <string>
 #define ADD_LAYER(v, LayerType, ...) v.push_back(std::make_unique<LayerType>(__VA_ARGS__))
 
 
 namespace fs = std::filesystem;
 
 
-int main(){
-    auto dev = DeviceManager::get_cpu_device();
+int main(int argc, char** argv){
+    bool use_gpu = false;
+    if (argc > 1) {
+        std::string mode = argv[1];
+        if (mode == "--gpu" || mode == "gpu") {
+            use_gpu = true;
+        } else if (mode == "--cpu" || mode == "cpu") {
+            use_gpu = false;
+        } else {
+            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu]" << std::endl;
+            return 1;
+        }
+    }
+
+    auto dev = use_gpu ? DeviceManager::get_gpu_device() : DeviceManager::get_cpu_device();
+    std::cout << "Device: " << (use_gpu ? "GPU" : "CPU") << std::endl;
     fs::path root = "datasets/mnist/flat";
     std::cout << root<< std::endl;
     fs::path train_images = root / "train_images_float32.bin";
@@ -100,7 +115,7 @@ int main(){
         28,
         28,
         10,
-        DeviceManager::get_cpu_device()
+        dev
     );
 
     /*
@@ -109,7 +124,7 @@ int main(){
     */
     cnn.set_random_weights();
     cnn.set_mode(LayerMode::Training);
-    std::size_t epoch = 2000;
+    std::size_t epoch = 10;
     //Negative sign because every layer's update_weight() applies param += lr*grad (ascent),
     //so this flips it into a descent step. TODO: fix the sign at the source in each update_weight().
     float lr = -0.01;
@@ -117,13 +132,13 @@ int main(){
     do{
         std::cout<<"Epoch: "<<std::to_string(epoch)<<std::endl;
         std::size_t curr_index = 0;
-        std::size_t batch_size = 32;
-        std::size_t samples_per_epoch = 320;
+        std::size_t batch_size = 64;
+        std::size_t samples_per_epoch = 970;
         
         do{
             std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
-            Tensor input = dataset.load_batch_cpu(curr_index,batch_size);
-            Tensor labels = dataset.labels_one_hot_cpu(curr_index,batch_size);
+            Tensor input = dataset.load_batch(curr_index,batch_size);
+            Tensor labels = dataset.labels_one_hot(curr_index,batch_size);
             /*Result contains a (N,) vector of errors*/
             auto errors = cnn.forward(input,labels);
             delta.zeros();
@@ -139,7 +154,8 @@ int main(){
             );
 
             /*Now delta has the error*/
-            std::cout<<"Loss: "<<delta.data()[0]<<std::endl;
+            Tensor delta_cpu(delta, DeviceManager::get_cpu_device());
+            std::cout<<"Loss: "<<delta_cpu.data()[0]<<std::endl;
 
             /*Now start backward pass and update*/
 

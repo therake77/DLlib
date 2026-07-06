@@ -6,7 +6,7 @@
 OutputLayer::OutputLayer(
     std::shared_ptr<Device> dev,
     std::size_t logits
-) : _logits(logits) , Layer(dev), _probabilities({1,logits}) { }
+) : _logits(logits) , Layer(dev), _probabilities({1,logits}, dev) { }
 
 /*
 Inference forward pass

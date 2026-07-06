@@ -22,8 +22,8 @@ int main() {
         Tensor input({2, 1, 1, 2}, values, device);
 
         BatchNorm batch_norm(1, device);
-        batch_norm.gamma.data()[0] = 1.0f;
-        batch_norm.beta.data()[0] = 0.0f;
+        require_close(batch_norm.gamma.data()[0], 1.0f, "BatchNorm gamma should initialize to one");
+        require_close(batch_norm.beta.data()[0], 0.0f, "BatchNorm beta should initialize to zero");
         batch_norm.set_mode(LayerMode::Training);
 
         auto output = batch_norm.forward(input);

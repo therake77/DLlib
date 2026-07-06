@@ -8,8 +8,8 @@ BatchNorm::BatchNorm(
     std::size_t channel_dim,
     std::shared_ptr<Device> dev
 ) : Layer(dev),
-    _gamma({channel_dim},dev),
-    _beta({channel_dim},dev),
+    _gamma({channel_dim},dev,1.0f,true),
+    _beta({channel_dim},dev,0.0f,true),
     _beta_grad({channel_dim},dev,0.0f,true),
     _means({channel_dim},dev,0.0f,true),
     _variances({channel_dim},dev,0.0f,true),
