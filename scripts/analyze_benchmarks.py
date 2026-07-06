@@ -27,6 +27,7 @@ TIME_TO_SECONDS = {
 }
 
 AGGREGATE_PRIORITY = ("mean", "median")
+DEVICE_TOKENS = {"CPU", "GPU", "CPU_to_GPU", "GPU_to_CPU"}
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,7 @@ def split_run_name(run_name: str, label: str | None) -> tuple[str, str, tuple[st
 
     device_index = None
     for index, part in enumerate(parts):
-        if part in {"CPU", "GPU"}:
+        if part in DEVICE_TOKENS:
             device_index = index
             break
 
@@ -286,6 +287,55 @@ def write_speedup_csv(speedups: list[dict[str, Any]], path: Path) -> None:
         writer.writerows(speedups)
 
 
+def build_transfer_rows(rows: list[BenchmarkRow], aggregate: str) -> list[dict[str, Any]]:
+    transfers: list[dict[str, Any]] = []
+    for row in rows:
+        if row.aggregate_name != aggregate:
+            continue
+        if row.base_name != "tensor_transfer":
+            continue
+        if row.device not in {"CPU_to_GPU", "GPU_to_CPU"}:
+            continue
+
+        bytes_count = row.counters.get("bytes", math.nan)
+        bandwidth = bytes_count / row.real_time_seconds if row.real_time_seconds > 0 else math.nan
+        transfers.append(
+            {
+                "direction": row.device,
+                "params": row.size_key,
+                "aggregate": aggregate,
+                "real_time_s": row.real_time_seconds,
+                "bytes": bytes_count,
+                "elements": row.counters.get("elements", math.nan),
+                "bytes_per_second": bandwidth,
+                "gib_per_second": bandwidth / (1024.0 ** 3),
+            }
+        )
+
+    return sorted(
+        transfers,
+        key=lambda row: (str(row["direction"]), natural_key(str(row["params"]))),
+    )
+
+
+def write_transfer_csv(transfers: list[dict[str, Any]], path: Path) -> None:
+    fields = [
+        "direction",
+        "params",
+        "aggregate",
+        "real_time_s",
+        "bytes",
+        "elements",
+        "bytes_per_second",
+        "gib_per_second",
+    ]
+
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(transfers)
+
+
 def try_import_matplotlib():
     try:
         import matplotlib  # type: ignore
@@ -332,6 +382,54 @@ def plot_speedups(speedups: list[dict[str, Any]], out_dir: Path) -> int:
     return count
 
 
+def plot_transfers(transfers: list[dict[str, Any]], out_dir: Path) -> int:
+    if not transfers:
+        return 0
+
+    plt = try_import_matplotlib()
+    if plt is None:
+        return 0
+
+    figure_dir = out_dir / "figures"
+    figure_dir.mkdir(parents=True, exist_ok=True)
+
+    by_direction: dict[str, list[dict[str, Any]]] = {}
+    for row in transfers:
+        by_direction.setdefault(str(row["direction"]), []).append(row)
+
+    labels = sorted({str(row["params"]) for row in transfers}, key=natural_key)
+    x_positions = list(range(len(labels)))
+    width = 0.36
+
+    fig, ax = plt.subplots(figsize=(max(6.0, 1.4 * len(labels)), 4.0))
+    directions = sorted(by_direction)
+    for direction_index, direction in enumerate(directions):
+        rows_by_param = {str(row["params"]): row for row in by_direction[direction]}
+        values = [
+            float(rows_by_param[label]["gib_per_second"])
+            if label in rows_by_param else 0.0
+            for label in labels
+        ]
+        offset = (direction_index - (len(directions) - 1) / 2.0) * width
+        ax.bar(
+            [position + offset for position in x_positions],
+            values,
+            width=width,
+            label=direction,
+        )
+
+    ax.set_title("Bandwidth de transferencias CPU/GPU")
+    ax.set_ylabel("GiB/s")
+    ax.set_xlabel("Elementos float32 transferidos")
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(labels, rotation=30)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(figure_dir / "tensor_transfer_bandwidth.png", dpi=160)
+    plt.close(fig)
+    return 1
+
+
 def main() -> int:
     args = parse_args()
     input_path = Path(args.input)
@@ -344,19 +442,24 @@ def main() -> int:
 
     processed_csv = out_dir / "benchmark_rows.csv"
     speedup_csv = out_dir / "speedups_cpu_gpu.csv"
+    transfer_csv = out_dir / "transfer_bandwidth.csv"
 
     write_processed_csv(rows, processed_csv)
     speedups = build_speedup_rows(rows, args.aggregate)
     write_speedup_csv(speedups, speedup_csv)
+    transfers = build_transfer_rows(rows, args.aggregate)
+    write_transfer_csv(transfers, transfer_csv)
 
     figure_count = 0
     if not args.no_plots:
         figure_count = plot_speedups(speedups, out_dir)
+        figure_count += plot_transfers(transfers, out_dir)
 
     print(f"Input: {input_path}")
     print(f"Rows: {len(rows)}")
     print(f"Processed CSV: {processed_csv}")
     print(f"Speedup CSV: {speedup_csv}")
+    print(f"Transfer CSV: {transfer_csv}")
     if args.no_plots:
         print("Figures: skipped")
     elif figure_count == 0:

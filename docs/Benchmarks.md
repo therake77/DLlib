@@ -222,6 +222,7 @@ Flujo recomendado para generar datos reproducibles:
 cmake -S . -B build
 cmake --build build --target cnn_benchmark --config Release
 .\build\benchmarks\Release\cnn_benchmark.exe `
+  --benchmark_min_time=0.02s `
   --benchmark_repetitions=10 `
   --benchmark_report_aggregates_only=false `
   --benchmark_format=json `
@@ -260,6 +261,7 @@ Salidas generadas:
 ```text
 benchmarks/results/processed/benchmark_rows.csv
 benchmarks/results/processed/speedups_cpu_gpu.csv
+benchmarks/results/processed/transfer_bandwidth.csv
 benchmarks/results/processed/figures/
 ```
 
@@ -270,6 +272,8 @@ speedup_cpu_over_gpu = cpu_real_time_s / gpu_real_time_s
 ```
 
 Las figuras PNG muestran el speedup CPU/GPU por benchmark. Una barra mayor que `1` significa que GPU fue mas rapido que CPU para ese caso. Una barra menor que `1` significa que CPU fue mas rapido que GPU.
+
+`transfer_bandwidth.csv` contiene las mediciones de transferencia `CPU_to_GPU` y `GPU_to_CPU`, reportadas como bytes por segundo y GiB/s. La figura `tensor_transfer_bandwidth.png` resume esos resultados.
 
 Si solo se quieren generar CSV sin figuras:
 
@@ -297,13 +301,15 @@ Hasta entonces, es preferible medir operaciones y capas por separado.
 
 ## Benchmarks de red completa
 
-El ejecutable `cnn_benchmark` incluye benchmarks de una CNN tipo MNIST basada en la arquitectura usada por `project/app.cpp`:
+El ejecutable `cnn_benchmark` incluye benchmarks de una CNN tipo MNIST sin BatchNorm:
 
 ```text
-Conv2D -> BatchNorm -> LeakyReLU -> MaxPooling
-Conv2D -> BatchNorm -> LeakyReLU -> MaxPooling
+Conv2D -> LeakyReLU -> MaxPooling
+Conv2D -> LeakyReLU -> MaxPooling
 Flatten -> FullyConnected -> LeakyReLU -> FullyConnected -> OutputLayer
 ```
+
+BatchNorm se excluye de estos benchmarks porque la capa todavia esta bajo revision funcional en el entrenamiento. Hasta que esa ruta este estable, las graficas principales de red completa deben medir la arquitectura que se espera que aprenda correctamente.
 
 Los benchmarks disponibles son:
 
@@ -312,6 +318,8 @@ cnn_forward/CPU
 cnn_forward/GPU
 cnn_training_step_same_batch/CPU
 cnn_training_step_same_batch/GPU
+tensor_transfer/CPU_to_GPU
+tensor_transfer/GPU_to_CPU
 ```
 
 `cnn_training_step_same_batch` mide una iteracion completa:

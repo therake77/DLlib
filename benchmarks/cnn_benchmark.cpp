@@ -2,7 +2,6 @@
 
 #include <core/ConvLayer.hpp>
 #include <core/ActivationLayer.hpp>
-#include <core/BatchNormLayer.hpp>
 #include <core/ConvNeuralNetwork.hpp>
 #include <core/FullyConnected.hpp>
 #include <core/Flatten.hpp>
@@ -55,7 +54,7 @@ Tensor make_one_hot_labels(
     return Tensor({batch, classes, 0, 0}, labels.data(), device);
 }
 
-ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device, bool use_batchnorm = true) {
+ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device) {
     std::vector<std::unique_ptr<Layer>> layers;
 
     layers.push_back(std::make_unique<Conv2D>(
@@ -64,9 +63,6 @@ ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device,
         std::array<std::size_t, 2>{0, 0},
         std::array<std::size_t, 2>{1, 1}
     ));
-    if(use_batchnorm) {
-        layers.push_back(std::make_unique<BatchNorm>(32, device));
-    }
     layers.push_back(std::make_unique<ActivationLayer>(ActivationTypes::LeakyReLU, device));
     layers.push_back(std::make_unique<MaxPooling>(
         std::array<std::size_t, 2>{2, 2},
@@ -81,9 +77,6 @@ ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device,
         std::array<std::size_t, 2>{0, 0},
         std::array<std::size_t, 2>{1, 1}
     ));
-    if(use_batchnorm) {
-        layers.push_back(std::make_unique<BatchNorm>(64, device));
-    }
     layers.push_back(std::make_unique<ActivationLayer>(ActivationTypes::LeakyReLU, device));
     layers.push_back(std::make_unique<MaxPooling>(
         std::array<std::size_t, 2>{2, 2},
@@ -236,12 +229,47 @@ void fully_connected_forward(benchmark::State& state, BenchDevice bench_device) 
     set_common_counters(state, bench_device, output_elements);
 }
 
-void cnn_forward(benchmark::State& state, BenchDevice bench_device, bool use_batchnorm) {
+void tensor_transfer(
+    benchmark::State& state,
+    BenchDevice source_device,
+    BenchDevice target_device
+) {
+    std::size_t elements = static_cast<std::size_t>(state.range(0));
+    auto source = make_device(source_device);
+    auto target = make_device(target_device);
+
+    for(auto _ : state) {
+        state.PauseTiming();
+        auto tensor = std::make_unique<Tensor>(
+            std::array<std::size_t, TENSOR_MAX_DIM>{elements, 0, 0, 0},
+            source
+        );
+        state.ResumeTiming();
+
+        tensor->to(target);
+        benchmark::DoNotOptimize(tensor->data());
+
+        state.PauseTiming();
+        tensor.reset();
+        state.ResumeTiming();
+    }
+
+    state.counters["bytes"] = static_cast<double>(elements * sizeof(float));
+    state.counters["bytes_per_second"] = benchmark::Counter(
+        static_cast<double>(elements * sizeof(float)),
+        benchmark::Counter::kIsIterationInvariantRate
+    );
+    state.counters["elements"] = static_cast<double>(elements);
+    std::string label = std::string(device_name(source_device)) + "_to_" + device_name(target_device);
+    state.SetLabel(label);
+}
+
+void cnn_forward(benchmark::State& state, BenchDevice bench_device) {
     std::size_t batch = static_cast<std::size_t>(state.range(0));
     auto device = make_device(bench_device);
 
     Tensor input({batch, 1, 28, 28}, device);
-    auto cnn = make_mnist_cnn(device, use_batchnorm);
+    auto cnn = make_mnist_cnn(device);
     cnn.set_mode(LayerMode::Inference);
 
     auto warmup = cnn.forward(input);
@@ -260,13 +288,13 @@ void cnn_forward(benchmark::State& state, BenchDevice bench_device, bool use_bat
     set_common_counters(state, bench_device, batch * 10);
 }
 
-void cnn_training_step_same_batch(benchmark::State& state, BenchDevice bench_device, bool use_batchnorm) {
+void cnn_training_step_same_batch(benchmark::State& state, BenchDevice bench_device) {
     std::size_t batch = static_cast<std::size_t>(state.range(0));
     auto device = make_device(bench_device);
 
     Tensor input({batch, 1, 28, 28}, device);
     Tensor labels = make_one_hot_labels(batch, 10, device);
-    auto cnn = make_mnist_cnn(device, use_batchnorm);
+    auto cnn = make_mnist_cnn(device);
     cnn.set_mode(LayerMode::Training);
 
     constexpr float learning_rate = -0.01f;
@@ -309,19 +337,11 @@ void fully_connected_forward_cpu(benchmark::State& state) {
 }
 
 void cnn_forward_cpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::CPU, true);
-}
-
-void cnn_forward_no_batchnorm_cpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::CPU, false);
+    cnn_forward(state, BenchDevice::CPU);
 }
 
 void cnn_training_step_same_batch_cpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::CPU, true);
-}
-
-void cnn_training_step_same_batch_no_batchnorm_cpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::CPU, false);
+    cnn_training_step_same_batch(state, BenchDevice::CPU);
 }
 
 #ifdef __USE_CUDA__
@@ -342,19 +362,19 @@ void fully_connected_forward_gpu(benchmark::State& state) {
 }
 
 void cnn_forward_gpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::GPU, true);
-}
-
-void cnn_forward_no_batchnorm_gpu(benchmark::State& state) {
-    cnn_forward(state, BenchDevice::GPU, false);
+    cnn_forward(state, BenchDevice::GPU);
 }
 
 void cnn_training_step_same_batch_gpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::GPU, true);
+    cnn_training_step_same_batch(state, BenchDevice::GPU);
 }
 
-void cnn_training_step_same_batch_no_batchnorm_gpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::GPU, false);
+void tensor_transfer_cpu_to_gpu(benchmark::State& state) {
+    tensor_transfer(state, BenchDevice::CPU, BenchDevice::GPU);
+}
+
+void tensor_transfer_gpu_to_cpu(benchmark::State& state) {
+    tensor_transfer(state, BenchDevice::GPU, BenchDevice::CPU);
 }
 #endif
 
@@ -387,22 +407,16 @@ BENCHMARK(fully_connected_forward_cpu)
 BENCHMARK(cnn_forward_cpu)
     ->Name("cnn_forward/CPU")
     ->Arg(1)
-    ->Arg(8);
-
-BENCHMARK(cnn_forward_no_batchnorm_cpu)
-    ->Name("cnn_forward_no_batchnorm/CPU")
-    ->Arg(1)
-    ->Arg(8);
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32);
 
 BENCHMARK(cnn_training_step_same_batch_cpu)
     ->Name("cnn_training_step_same_batch/CPU")
     ->Arg(1)
-    ->Arg(8);
-
-BENCHMARK(cnn_training_step_same_batch_no_batchnorm_cpu)
-    ->Name("cnn_training_step_same_batch_no_batchnorm/CPU")
-    ->Arg(1)
-    ->Arg(8);
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32);
 
 #ifdef __USE_CUDA__
 BENCHMARK(tensor_add_gpu)
@@ -432,20 +446,26 @@ BENCHMARK(fully_connected_forward_gpu)
 BENCHMARK(cnn_forward_gpu)
     ->Name("cnn_forward/GPU")
     ->Arg(1)
-    ->Arg(8);
-
-BENCHMARK(cnn_forward_no_batchnorm_gpu)
-    ->Name("cnn_forward_no_batchnorm/GPU")
-    ->Arg(1)
-    ->Arg(8);
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32);
 
 BENCHMARK(cnn_training_step_same_batch_gpu)
     ->Name("cnn_training_step_same_batch/GPU")
     ->Arg(1)
-    ->Arg(8);
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32);
 
-BENCHMARK(cnn_training_step_same_batch_no_batchnorm_gpu)
-    ->Name("cnn_training_step_same_batch_no_batchnorm/GPU")
-    ->Arg(1)
-    ->Arg(8);
+BENCHMARK(tensor_transfer_cpu_to_gpu)
+    ->Name("tensor_transfer/CPU_to_GPU")
+    ->Arg(1 << 12)
+    ->Arg(1 << 16)
+    ->Arg(1 << 20);
+
+BENCHMARK(tensor_transfer_gpu_to_cpu)
+    ->Name("tensor_transfer/GPU_to_CPU")
+    ->Arg(1 << 12)
+    ->Arg(1 << 16)
+    ->Arg(1 << 20);
 #endif
