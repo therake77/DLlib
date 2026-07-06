@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <cstddef>
 #include <string>
+#include <limits>
 #define ADD_LAYER(v, LayerType, ...) v.push_back(std::make_unique<LayerType>(__VA_ARGS__))
 
 
@@ -23,6 +24,7 @@ int main(int argc, char** argv){
     }
 
     auto dev = use_gpu ? DeviceManager::get_gpu_device() : DeviceManager::get_cpu_device();
+    auto cpu_dev = DeviceManager::get_cpu_device();
     std::cout << "Device: " << (use_gpu ? "GPU" : "CPU") << std::endl;
     fs::path root = "datasets/mnist/flat";
     std::cout << root<< std::endl;
@@ -38,13 +40,13 @@ int main(int argc, char** argv){
         std::array<std::size_t,2>{1,1}
     );
     ADD_LAYER(
-        layers,BatchNorm,
-        32,dev
-    );
-    ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::ReLU,
         dev
+    );
+    ADD_LAYER(
+        layers,BatchNorm,
+        32,dev
     );
     ADD_LAYER(
         layers,MaxPooling,
@@ -61,13 +63,13 @@ int main(int argc, char** argv){
         std::array<std::size_t,2>{1,1}
     );
     ADD_LAYER(
-        layers,BatchNorm,
-        64,dev
-    );
-    ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::ReLU,
         dev
+    );
+    ADD_LAYER(
+        layers,BatchNorm,
+        64,dev
     );
     ADD_LAYER(
         layers,MaxPooling,
@@ -129,12 +131,13 @@ int main(int argc, char** argv){
     //so this flips it into a descent step. TODO: fix the sign at the source in each update_weight().
     float lr = -0.01;
     Tensor delta = Tensor({1}, dev, 0.0f, true);
+    std::size_t curr_index = 0;
+    std::size_t batch_size = 64;
+    std::size_t n_batchs_per_epoch = 937;
     do{
         std::cout<<"Epoch: "<<std::to_string(epoch)<<std::endl;
-        std::size_t curr_index = 0;
-        std::size_t batch_size = 64;
-        std::size_t samples_per_epoch = 970;
         
+        std::size_t counter = 0;
         do{
             std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
             Tensor input = dataset.load_batch(curr_index,batch_size);
@@ -154,15 +157,15 @@ int main(int argc, char** argv){
             );
 
             /*Now delta has the error*/
-            Tensor delta_cpu(delta, DeviceManager::get_cpu_device());
+            Tensor delta_cpu(delta, cpu_dev);
             std::cout<<"Loss: "<<delta_cpu.data()[0]<<std::endl;
-
-            /*Now start backward pass and update*/
 
             cnn.backward(input,labels);
             cnn.update_weights(lr);
-            curr_index+=batch_size;
-        }while(curr_index + batch_size <= samples_per_epoch);
+            curr_index += batch_size;
+            curr_index%=dataset.size();
+            counter++;
+        }while(counter < n_batchs_per_epoch);
         epoch--;
     }while (epoch > 0);
 
@@ -170,7 +173,40 @@ int main(int argc, char** argv){
     /*Now, perform inference*/
     cnn.set_mode(LayerMode::Inference); 
 
-    
+    curr_index = 0;
+    do{
+        std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
+        Tensor input = dataset.load_cpu(curr_index);
+        Tensor label = dataset.labels_one_hot_cpu(curr_index,1);
+        input.to(dev);
+        label.to(cpu_dev);
+        auto _result = cnn.forward(input);
+        Tensor result = Tensor(*_result,cpu_dev);
+        /*Result contains a (1,L) vector of logits*/
+        /*Must extract manually the true value*/
+        std::size_t inf_rum = 0;
+        float max_value = std::numeric_limits<float>::lowest();
+        const float* data = result.data();
+        for(std::size_t i = 0 ; i < 10; i++){
+            if(data[i] > max_value){
+                max_value = data[i];
+                inf_rum = i;
+            }
+        }
+        std::cout<<"Result: "<<std::to_string(inf_rum)<<std::endl;
+        std::size_t true_num = 0;
+        max_value = std::numeric_limits<float>::lowest();
+        data = label.data();
+        for(std::size_t i = 0 ; i < 10; i++){
+            if(data[i] > max_value){
+                max_value = data[i];
+                true_num = i;
+            }
+        }
+        std::cout<<"True value: "<<std::to_string(true_num)<<std::endl;
+        curr_index++;
+    }while(curr_index <= 20);
+
 
 
 }

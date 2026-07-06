@@ -4,6 +4,10 @@
 #include <math/TensorMath.hpp>
 #include <cassert>
 
+namespace{
+    constexpr float LEAKY_RELU_ALPHA = 0.01f;
+};
+
 ActivationLayer::ActivationLayer(
     ActivationTypes _type,
     std::shared_ptr<Device> dev 
@@ -32,7 +36,17 @@ std::shared_ptr<Tensor> ActivationLayer::forward( const Tensor& in ){
             );
             break;
         };
-        default : 
+        case(ActivationTypes::LeakyReLU) : {
+            //LeakyReLU(x) = ReLU(x) + alpha*(x - ReLU(x))
+            //(x - ReLU(x)) is x for x<=0 and 0 for x>0, so this is x for x>0 and alpha*x for x<=0
+            Tensor relu_x = Tensor(in.shape._shapes, this->_dev);
+            TensorMath::reLU(in, relu_x);
+            TensorMath::sub(in, relu_x, forward_out);
+            TensorMath::scale(forward_out, LEAKY_RELU_ALPHA, forward_out);
+            TensorMath::add(forward_out, relu_x, forward_out);
+            break;
+        };
+        default :
             throw std::runtime_error("A unexpected type recevied");
             break;
     }
@@ -84,11 +98,37 @@ std::shared_ptr<Tensor> ActivationLayer::backward( const Tensor& backward_grad, 
             );
             break;
         }
+        case ActivationTypes::LeakyReLU:{
+            //Derivative of LeakyReLU(x) is 1 for x>0 and alpha for x<=0.
+            //binary_positive_mask gives 1/0, so blend it into 1/alpha: mask*(1-alpha) + alpha
+            TensorMath::binary_positive_mask(
+                forward_input,
+                backward_out
+            );
+            TensorMath::scale(
+                backward_out,
+                1.0f - LEAKY_RELU_ALPHA,
+                backward_out
+            );
+            Tensor alpha_tensor = Tensor({1},this->_dev,LEAKY_RELU_ALPHA,true);
+            TensorMath::add(
+                backward_out,
+                alpha_tensor,
+                backward_out
+            );
+            //Perform element_wise multiplication on the mask with the incoming gradient
+            TensorMath::multiply(
+                backward_grad,
+                backward_out,
+                backward_out
+            );
+            break;
+        }
         default:
             throw std::runtime_error("A unexpected type recevied");
             break;
     }
-    
+
     return this->_backward_out;
 }
 

@@ -37,7 +37,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor expanded_means = Tensor(this->_running_means,this->_dev);
 
         //Before proceeding with the variances, first cache the value \sqrt(\sigma^2+\epsilon)
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
         TensorMath::add(
             this->_running_variances,
             epsilon,
@@ -96,7 +96,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor& normalized_input = *(this->_normalized_input);
 
         //An epsilon value
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
 
         //Cache \sqrt(\sigma^2+\epsilon) on this->_sqrt_variances: backward() reads this member,
         //so it must be persisted here (not just computed in a local expanded copy), otherwise

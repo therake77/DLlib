@@ -50,7 +50,9 @@ std::shared_ptr<Tensor> FullyConnected::backward(const Tensor& backward_grad, co
         *(this->_grad)
     );
     this->_bias_grad->reshape({this->output_dim});
-    //Compute beta gradient
+    //Compute beta gradient. TensorMath::sum accumulates (+=), so zero first, otherwise this
+    //picks up leftover noise/stale gradient from construction or the previous batch.
+    this->_bias_grad->zeros();
     TensorMath::sum(
         backward_grad,
         0,
