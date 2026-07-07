@@ -143,6 +143,9 @@ target_link_libraries(fc_only_test PRIVATE cnn_lib)
 add_executable(flatten_fc_test tests/flatten_fc_test.cpp)
 target_link_libraries(flatten_fc_test PRIVATE cnn_lib)
 
+add_executable(bn_train_test tests/bn_train_test.cpp)
+target_link_libraries(bn_train_test PRIVATE cnn_lib)
+
 add_executable(main project/app.cpp)
 target_link_libraries(main PRIVATE cnn_lib)
 
@@ -155,6 +158,7 @@ if(CMAKE_CUDA_COMPILER)
     target_link_libraries(kernel_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(fc_only_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(flatten_fc_test PRIVATE CUDA::cuda_driver)
+    target_link_libraries(bn_train_test PRIVATE CUDA::cuda_driver)
     target_link_libraries(main PRIVATE CUDA::cuda_driver)
 endif()
 
