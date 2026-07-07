@@ -52,7 +52,7 @@ int main(){
         {1,1}
     );
     BatchNorm batch_layer = BatchNorm(
-        1,device
+        2,device
     );
     MaxPooling max_pool_layer = MaxPooling(
         {2,2},
@@ -98,38 +98,31 @@ int main(){
         true
     );
     std::cout<<"Input:\n";
-    fancy_print(input);
     //Conv2D
     std::cout<<"Con2D:\n";
     auto result1 = conv_layer.forward(input);
-    fancy_print(*result1);
+
     std::cout<<"BatchNorm:\n";
     auto result2 = batch_layer.forward(*result1);
-    fancy_print(*result2);
     std::cout<<"MaxPool:\n";
     auto result3 = max_pool_layer.forward(*result2);
-    fancy_print(*result3);
     std::cout<<"Flatten:\n";
     auto result4 = flatten_layer.forward(*result3);
-    fancy_print(*result4);
     std::cout<<"Activation1:\n";
     auto result5 = activation.forward(*result4);
-    fancy_print(*result5);
     std::cout<<"FullyConnected1:\n";
     auto result6 = dense1.forward(*result5);
-    fancy_print(*result6);
     std::cout<<"Activation2:\n";
     auto result7 = activation2.forward(*result6);
-    fancy_print(*result7);
     std::cout<<"FullyConnected2:\n";
     auto result8 = dense2.forward(*result7);
-    fancy_print(*result8);
     std::cout<<"Sotfmax+CrossEntropy:\n";
     auto output = out.forward(*result8);
     std::cout<<"Output\n";
-    fancy_print(
-        *output
-    );
+
+
+    Tensor output_cpu = Tensor(*output);
+    fancy_print(output_cpu);
 
     //Now it comes the backward pass
     //Let the label corresponding to the current batch:
@@ -140,6 +133,26 @@ int main(){
         true
     );
     
-    //Feed it to the 
+    //Feed it to the last layer
+    auto backward_grad1 = out.backward(label,*result8);
+    std::cout<<"backward_grad1 passed\n";
+    auto backward_grad2 = dense2.backward(*backward_grad1,*result7);
+    std::cout<<"backward_grad2 passed\n";
+    auto backward_grad3 = activation2.backward(*backward_grad2,*result6);
+    std::cout<<"backward_grad3 passed\n";
+    auto backward_grad4 = dense1.backward(*backward_grad3,*result5);
+    std::cout<<"backward_grad4 passed\n";
+    auto backward_grad5 = activation.backward(*backward_grad4,*result4);
+    std::cout<<"backward_grad5 passed\n";
+    auto backward_grad6 = flatten_layer.backward(*backward_grad5,*result3);
+    std::cout<<"backward_grad6 passed\n";
+    auto backward_grad7 = max_pool_layer.backward(*backward_grad6,*result2);
+    std::cout<<"backward_grad7 passed\n";
+    auto backward_grad8 = batch_layer.backward(*backward_grad7,*result1);
+    std::cout<<"backward_grad8 passed\n";
+    auto backward_grad9 = conv_layer.backward(*backward_grad8,input);
+    
+    Tensor backward_cpu = Tensor(*backward_grad9);
+    fancy_print(backward_cpu);
 
 }

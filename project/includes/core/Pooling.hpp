@@ -18,7 +18,7 @@ public:
 
     std::shared_ptr<Tensor> forward( const Tensor& ) override;
     std::shared_ptr<Tensor> backward( const Tensor&, const Tensor& ) override;
-    void update_weight() override;
+    void update_weight(float) override;
 };  
 
 class AvgPooling : public Layer{
@@ -32,10 +32,11 @@ public:
     AvgPooling(
         std::array<std::size_t, 2> _window_shape,
         std::array<std::size_t, 2> _stride,
-        std::array<std::size_t, 2> _padding
+        std::array<std::size_t, 2> _padding,
+        std::shared_ptr<Device> dev
     );
 
     std::shared_ptr<Tensor> forward( const Tensor& ) override;
     std::shared_ptr<Tensor> backward( const Tensor&, const Tensor&  ) override;
-    void update_weight() override;
+    void update_weight(float) override;
 };

@@ -1,2 +1,9 @@
 .vscode
+.agents
 build/
+datasets/*
+!datasets/.gitkeep
+CLAUDE.md
+.claude
+docs/bugs_found.md
+scripts/.venv/

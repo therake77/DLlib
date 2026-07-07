@@ -1,63 +1,80 @@
-#include <iostream>
 #include <core/Pooling.hpp>
 
-void fancy_print(Tensor& a){
-    const float* data = a.data();
-    std::vector<size_t> coords(a.shape.n_dim,0);
-    for(size_t i = 0; i < a.shape.n_dim; ++i){
-        std::cout<<"[";
-    }
-    for(size_t el = 0; el < a.shape.n_elements; ++el){
-        size_t flat_idx = 0;
-        for (size_t i = 0; i < a.shape.n_dim; ++i){
-            flat_idx+=coords[i] * a.shape._strides[i];
-        }
-        std::cout << data[flat_idx];
-        bool finished = false;
-        size_t reset = 0;
-        for(size_t i = a.shape.n_dim; i --> 0; ){
-            coords[i]++;
-            if(coords[i] < a.shape[i]){ break; }
-            else{ if( i ==0 ){ finished = true; }else{ coords[i] = 0; reset++; } }
-        }
+#include <cmath>
+#include <iostream>
+#include <stdexcept>
 
-        if(finished || el == a.shape.n_elements -1 ){
-            for(size_t i = 0; i < a.shape.n_dim; ++i) std::cout<<"]";
-            std::cout<< std::endl;
-            break;
-        }
+namespace {
 
-        if(reset == 0){std::cout<<", ";}
-        else{
-            for(size_t i = 0; i < reset; ++i){std::cout<<"]";}
-            std::cout<<",\n";
-            for(size_t i = 0; i < a.shape.n_dim - reset; ++i){ std::cout<< " "; }
-            for(size_t i = 0; i < reset; ++i){ std::cout<<"["; } 
-        }
+void require(bool condition, const char* message) {
+    if(!condition) {
+        throw std::runtime_error(message);
     }
 }
 
-int main(){
+void require_close(float actual, float expected, const char* message) {
+    if(std::fabs(actual - expected) > 1e-5f) {
+        throw std::runtime_error(message);
+    }
+}
 
-    auto device = DeviceManager::get_cpu_device();
+} // namespace
 
-    Tensor input = Tensor({1,1,5,5},device);
-    
+int main() {
+    try {
+        auto device = DeviceManager::get_cpu_device();
 
-    MaxPooling max_pool = MaxPooling(
-        {2,2},{1,1},{0,0}
-    );
+        float increasing_values[25];
+        for(std::size_t i = 0; i < 25; ++i) {
+            increasing_values[i] = static_cast<float>(i + 1);
+        }
 
-    AvgPooling avg_pool = AvgPooling(
-        {2,2},{1,1},{0,0}
-    );
+        Tensor max_input({1, 1, 5, 5}, increasing_values, device);
+        MaxPooling max_pool({2, 2}, {2, 2}, {0, 0}, device);
 
-    Tensor output1 = max_pool.forward(input);
-    Tensor output2 = avg_pool.forward(input);
-    fancy_print(input);
+        auto max_output = max_pool.forward(max_input);
+        require(max_output->shape == Shape({1, 1, 2, 2}), "MaxPool forward shape mismatch");
 
-    fancy_print(output1);
-    fancy_print(output2);
+        const float* max_out = max_output->data();
+        require_close(max_out[0], 7.0f, "Unexpected max pool value at 0");
+        require_close(max_out[1], 9.0f, "Unexpected max pool value at 1");
+        require_close(max_out[2], 17.0f, "Unexpected max pool value at 2");
+        require_close(max_out[3], 19.0f, "Unexpected max pool value at 3");
 
-    return 0;
+        Tensor max_grad({1, 1, 2, 2}, device, 1.0f, true);
+        auto max_backward = max_pool.backward(max_grad, max_input);
+        const float* max_back = max_backward->data();
+
+        for(std::size_t i = 0; i < 25; ++i) {
+            float expected =
+                (i == 6 || i == 8 || i == 16 || i == 18) ? 1.0f : 0.0f;
+            require_close(max_back[i], expected, "Unexpected max pool backward value");
+        }
+
+        Tensor avg_input({1, 1, 4, 4}, device, 1.0f, true);
+        AvgPooling avg_pool({2, 2}, {2, 2}, {0, 0}, device);
+
+        auto avg_output = avg_pool.forward(avg_input);
+        require(avg_output->shape == Shape({1, 1, 2, 2}), "AvgPool forward shape mismatch");
+
+        const float* avg_out = avg_output->data();
+        for(std::size_t i = 0; i < avg_output->shape.n_elements; ++i) {
+            require_close(avg_out[i], 1.0f, "Unexpected avg pool forward value");
+        }
+
+        Tensor avg_grad({1, 1, 2, 2}, device, 1.0f, true);
+        auto avg_backward = avg_pool.backward(avg_grad, avg_input);
+        const float* avg_back = avg_backward->data();
+
+        for(std::size_t i = 0; i < avg_backward->shape.n_elements; ++i) {
+            require_close(avg_back[i], 0.25f, "Unexpected avg pool backward value");
+        }
+
+        std::cout << "Pooling tests passed" << std::endl;
+        return 0;
+    }
+    catch(const std::exception& e) {
+        std::cerr << "Pooling tests failed: " << e.what() << std::endl;
+        return 1;
+    }
 }

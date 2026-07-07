@@ -52,6 +52,7 @@ public:
     ) = 0;
     virtual void sigmoid(const float* a, float* out, size_t n_elements) = 0;
     virtual void tanh(const float* a, float* out, size_t n_elements) = 0;
+    
     virtual void softmax(
         const float* a,
         Shape a_shape, 

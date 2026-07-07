@@ -7,7 +7,7 @@ Conv2D::Conv2D(
     std::shared_ptr<Device> dev,
     std::array<size_t,2> _padding,
     std::array<size_t,2> _strides)
-  : _kernels(kernel_shape,dev,1.0f,true),   //TODO(TEMPORAL, CHANGE THIS)
+  : _kernels(kernel_shape,dev),
     padding(_padding),
     strides(_strides),
     Layer(dev)
@@ -61,6 +61,7 @@ Conv2D::Conv2D(
     //Reshape the output
     this->_forward_out->reshape({features,N,H_out,W_out});
     this->_forward_out->shape.transpose(0,1);
+    this->_forward_out->contiguous();
     return _forward_out;
 }
 
@@ -76,6 +77,7 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
     __check_initialization(this->_backward_out,forward_in.shape);
     //Create a temporal copy of the backward_grad
     Tensor _backward_grad_copy = Tensor(backward_grad,backward_grad.getDevice());
+    _backward_grad_copy.shape.transpose(0,1);
     _backward_grad_copy.reshape({
         backward_grad.shape[1],
         backward_grad.shape[0] * backward_grad.shape[2] * backward_grad.shape[3]
@@ -92,12 +94,16 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
     //Compute kernel to propagate backwards. First, flatten the kernel
     this->_kernels.reshape({features,channels*k_height*k_width});
     this->_kernels.shape.transpose();
-
+    this->_forward_col_input->shape.transpose();
     TensorMath::matmul(
         this->_kernels,
         _backward_grad_copy,
         *(this->_forward_col_input)     //Warning : use of _forward_col_input as a buffer
     );
+
+    //Put back again the kernels to their original shapes
+    this->_kernels.shape.transpose();
+    this->_kernels.reshape({features,channels,k_height,k_width});
 
     TensorMath::col2im2D(
         *(this->_forward_col_input),
@@ -110,11 +116,22 @@ std::shared_ptr<Tensor> Conv2D::backward( const Tensor& backward_grad, const Ten
 }
 
 
-void Conv2D::update_weight(){
+void Conv2D::update_weight(float lr){
     assert(this->_grad.get() != nullptr);
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         this->_kernels,
         *(this->_grad),
         this->_kernels
     );
-}   
+}
+
+void Conv2D::he_initialization(){
+    float fan_in = (float)this->_kernels.shape[1] * this->_kernels.shape[2] * this->_kernels.shape[3];
+    float std_dev = std::sqrt(2.0f/fan_in);
+    this->_kernels.normal_rand(0.0f,std_dev);
+}

@@ -19,6 +19,15 @@ public:
     void memset(void* dst, float value, size_t size) override;
     void memset_rand(void*dst, size_t size) override;
 
+    void memset_rand_normal_dist( void* dst, float mean, float std_dev, size_t n_floats ) override ;
+
+    void make_contiguous(
+        void* dst, 
+        const void* src, 
+        const std::vector<std::size_t> shapes,
+        const std::vector<std::size_t> faulty_strides
+    );
+
     DeviceType get_type() const override;
     std::string get_name() const override;
 };

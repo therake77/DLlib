@@ -19,5 +19,6 @@ public:
 
     std::shared_ptr<Tensor> forward( const Tensor& ) override;
     std::shared_ptr<Tensor> backward( const Tensor&, const Tensor&  ) override;
-    void update_weight() override;
+    void he_initialization() override;
+    void update_weight(float) override;
 };

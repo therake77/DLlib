@@ -8,8 +8,8 @@ BatchNorm::BatchNorm(
     std::size_t channel_dim,
     std::shared_ptr<Device> dev
 ) : Layer(dev),
-    _gamma({channel_dim},dev),
-    _beta({channel_dim},dev),
+    _gamma({channel_dim},dev,1.0f,true),
+    _beta({channel_dim},dev,0.0f,true),
     _beta_grad({channel_dim},dev,0.0f,true),
     _means({channel_dim},dev,0.0f,true),
     _variances({channel_dim},dev,0.0f,true),
@@ -18,28 +18,28 @@ BatchNorm::BatchNorm(
     _sqrt_variances({channel_dim},dev,0.0f,true)
 {
     //The gradient is also a vector of length channel_dim known at instantiation
-    this->_grad = std::make_shared<Tensor>(Tensor({channel_dim},dev,0.0f,true));
+    this->_grad = std::make_shared<Tensor>(std::array<std::size_t,TENSOR_MAX_DIM>{channel_dim},dev,0.0f,true);
 }
 
-std::shared_ptr<Tensor> BatchNorm::forward( 
+std::shared_ptr<Tensor> BatchNorm::forward(
     const Tensor& in
 ){
     __check_initialization(this->_forward_out,in.shape);
     __check_initialization(this->_normalized_input,in.shape);
     if(mode == LayerMode::Inference){
         //Check first, if normalized input holder and forward output holder are ok
-        
-        
+
+
         //Computes \gamma x* + \beta
         //We need: gamma, beta, but expanded. Using unsqueeze over a copy of them
         Tensor expanded_gamma = Tensor(this->_gamma,this->_dev);
         Tensor expanded_beta = Tensor(this->_beta,this->_dev);
         Tensor expanded_means = Tensor(this->_running_means,this->_dev);
-        
+
         //Before proceeding with the variances, first cache the value \sqrt(\sigma^2+\epsilon)
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
         TensorMath::add(
-            this->_variances,
+            this->_running_variances,
             epsilon,
             this->_sqrt_variances
         );
@@ -49,7 +49,7 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         );
         //Now we have computed the denominator of the normal formula. Expand that result
         Tensor expanded_sqrt_variances = Tensor(this->_sqrt_variances,this->_dev);
-        
+
         //Expand correctly the variables to match input dimension
         expanded_gamma.unsqueeze(0);
         expanded_beta.unsqueeze(0);
@@ -67,17 +67,17 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor& forward_out = *(this->_forward_out);
         Tensor& normalized_input = *(this->_normalized_input);
 
-    
-        // normalized_input <- in - expanded_means (X' = X - \mu) 
-        TensorMath::sub(in,expanded_means,normalized_input);    
+
+        // normalized_input <- in - expanded_means (X' = X - \mu)
+        TensorMath::sub(in,expanded_means,normalized_input);
         // normalized_input = normalized_input / expanded_variances  [ X' = (X' [which was = X - \mu] )/\sqrt(\sigma^2 + \epsilon) ]
-        TensorMath::divide(normalized_input,expanded_sqrt_variances,normalized_input); 
+        TensorMath::divide(normalized_input,expanded_sqrt_variances,normalized_input);
 
         //They are expanded. Now call the correct sequence of operations:
         TensorMath::multiply(expanded_gamma,normalized_input,forward_out);
         TensorMath::add(forward_out,expanded_beta,forward_out);
     }else{
-        
+
         //Compute means of the incoming X
         TensorMath::mean(
             in,
@@ -96,41 +96,50 @@ std::shared_ptr<Tensor> BatchNorm::forward(
         Tensor& normalized_input = *(this->_normalized_input);
 
         //An epsilon value
-        Tensor epsilon = Tensor({1},this->_dev,1e-5f,true);
+        Tensor epsilon = Tensor({1},this->_dev,1e-3f,true);
 
-        //Copy _gamma, _beta, _means, and _variances. We don't want to modify its shape
+        //Cache \sqrt(\sigma^2+\epsilon) on this->_sqrt_variances: backward() reads this member,
+        //so it must be persisted here (not just computed in a local expanded copy), otherwise
+        //backward() divides by the stale/zero constructor value.
+        TensorMath::add(
+            this->_variances,
+            epsilon,
+            this->_sqrt_variances
+        );
+        TensorMath::sqrt(
+            this->_sqrt_variances,
+            this->_sqrt_variances
+        );
+
+        //Copy _gamma, _beta, _means, and _sqrt_variances. We don't want to modify its shape
         Tensor expanded_gamma = Tensor(this->_gamma,this->_gamma.getDevice());
         Tensor expanded_beta = Tensor(this->_beta,this->_beta.getDevice());
         Tensor expanded_means = Tensor(this->_means,this->_means.getDevice());
-        Tensor expanded_variances = Tensor(this->_variances,this->_variances.getDevice());
-        
+        Tensor expanded_variances = Tensor(this->_sqrt_variances,this->_sqrt_variances.getDevice());
+
         expanded_gamma.unsqueeze(0);
         expanded_beta.unsqueeze(0);
         expanded_means.unsqueeze(0);
         expanded_variances.unsqueeze(0);
-        
-        expanded_gamma.outer_expand(in.shape.n_dim-2);
-        expanded_beta.outer_expand(in.shape.n_dim-2);
-        expanded_means.outer_expand(in.shape.n_dim-2);
-        expanded_variances.outer_expand(in.shape.n_dim-2);
-        
 
-        // normalized_input <- in - expanded_means (X' = X - \mu) 
-        TensorMath::sub(in,expanded_means,normalized_input);    
-        // expanded_variances <- epsilon + expanded_variances (\sigma^2 = \sigma^2 + \epsilon)
-        TensorMath::add(epsilon,expanded_variances,expanded_variances);
-        // expanded_variances <- \sqrt(expanded_variances)  ( \sigma^2 + \epsilon = \sqrt(\sigma^2 + \epsilon) )
-        TensorMath::sqrt(expanded_variances,expanded_variances);
+        expanded_gamma.inner_expand(in.shape.n_dim);
+        expanded_beta.inner_expand(in.shape.n_dim);
+        expanded_means.inner_expand(in.shape.n_dim);
+        expanded_variances.inner_expand(in.shape.n_dim);
+
+
+        // normalized_input <- in - expanded_means (X' = X - \mu)
+        TensorMath::sub(in,expanded_means,normalized_input);
         // normalized_input = normalized_input / expanded_variances  [ X' = (X' [which was = X - \mu] )/\sqrt(\sigma^2 + \epsilon) ]
-        TensorMath::divide(normalized_input,expanded_variances,normalized_input); 
+        TensorMath::divide(normalized_input,expanded_variances,normalized_input);
 
         //They are expanded. Now call the correct sequence of operations:
         TensorMath::multiply(expanded_gamma,normalized_input,forward_out);
         TensorMath::add(forward_out,expanded_beta,forward_out);
-        
+
         //Update the running means and variances
         TensorMath::scale(          //running_means = (1-momentum)running_means
-            this->_running_means,   
+            this->_running_means,
             1-momentum,
             this->_running_means
         );
@@ -189,7 +198,7 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
         normalized_input,
         *(this->_backward_out)     //Warning: using _backward_out as a temporary value holder
     );
-    
+
     TensorMath::reduce_all(
         *(this->_backward_out),
         _gamma_grad,
@@ -198,9 +207,9 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
 
     //Now compute the gradient to pass backwards
     //To do so, we need to expand the gradients to match the expected layout
-    
-    //Now that every tensor has the same dimension, we proceed
-    //compute dL/dX = (\gamma / M) . 1/\sqrt(\sigma^2 + \epsilon) . (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
+
+    //Now that every tensor has the same dimension, we proceed.
+    //dX = (gamma / sqrt(var + eps)) * (M*dY - dBeta - xHat*dGamma) / M
     float M = total_elements/channel_dim;
     //Create copies to expand in the formula
     //In the formula appears and needs to be expanded: gamma, _sqrt_variances, _beta_grad, _gamma_grad
@@ -210,25 +219,30 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
     Tensor expanded_gamma = Tensor(_gamma,this->_dev);
 
     expanded_grad_beta.unsqueeze(0);
-    expanded_grad_gamma.unsqueeze(0),
+    expanded_grad_gamma.unsqueeze(0);
     expanded_sqrt_variances.unsqueeze(0);
     expanded_gamma.unsqueeze(0);
-    expanded_grad_beta.inner_expand(n_dim-2);
-    expanded_grad_gamma.inner_expand(n_dim-2),
-    expanded_sqrt_variances.inner_expand(n_dim-2);
-    expanded_gamma.inner_expand(n_dim-2);
+    expanded_grad_beta.inner_expand(n_dim);
+    expanded_grad_gamma.inner_expand(n_dim);
+    expanded_sqrt_variances.inner_expand(n_dim);
+    expanded_gamma.inner_expand(n_dim);
 
-    //Now that all are well expanded, compute (M . dL/dY . dL/d\beta - X_normalized . dL/d\gamma )
-    //In two steps. First M . dL/dY . dL/d\beta saved in _backward_out, and then X_normalized . dL/d\gamma saved in X_normalized
-    // I believe X_normalized is not needed in further procedures after backwards
-    TensorMath::multiply(
+    //First compute M*dY - dBeta into _backward_out.
+    TensorMath::scale(
         backward_grad,
+        M,
+        *(this->_backward_out)
+    );
+    TensorMath::sub(
+        *(this->_backward_out),
         expanded_grad_beta,
         *(this->_backward_out)
     );
+
+    //Then subtract xHat*dGamma. normalized_input is no longer needed after this point.
     TensorMath::multiply(
         normalized_input,
-        expanded_gamma,
+        expanded_grad_gamma,
         normalized_input
     );
     TensorMath::sub(
@@ -252,16 +266,40 @@ std::shared_ptr<Tensor> BatchNorm::backward( const Tensor& backward_grad, const 
         1/M,
         *(this->_backward_out)
     );
+
+    // Keep BatchNorm affine parameter updates independent from spatial size.
+    // The dX formula above needs summed dBeta/dGamma, but gamma/beta updates are
+    // much stabler when averaged over the same reduction domain.
+    TensorMath::scale(
+        _gamma_grad,
+        1/M,
+        _gamma_grad
+    );
+    TensorMath::scale(
+        this->_beta_grad,
+        1/M,
+        this->_beta_grad
+    );
     return this->_backward_out;
 }
 
-void BatchNorm::update_weight(){
+void BatchNorm::update_weight(float lr){
     assert(this->_grad.get() != nullptr);
-    //This is quite simple, just add _grad to _gamma and _beta_grad to _beta
+    //This is quite simple, just add _grad*lr to _gamma and _beta_grad*lr to _beta
+    TensorMath::scale(
+        *(this->_grad),
+        lr,
+        *(this->_grad)
+    );
     TensorMath::add(
         *(this->_grad),
         _gamma,
         _gamma
+    );
+    TensorMath::scale(
+        this->_beta_grad,
+        lr,
+        this->_beta_grad
     );
     TensorMath::add(
         this->_beta_grad,
