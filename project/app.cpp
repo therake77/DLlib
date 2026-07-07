@@ -189,6 +189,8 @@ int main(int argc, char** argv){
     cnn.set_mode(LayerMode::Inference); 
 
     curr_index = 0;
+    std::size_t hit = 0;
+    std::size_t n_images = 20;
     do{
         std::cout<<"Current index: "<<std::to_string(curr_index)<<std::endl;
         Tensor input = dataset.load_cpu(curr_index);
@@ -219,9 +221,10 @@ int main(int argc, char** argv){
             }
         }
         std::cout<<"True value: "<<std::to_string(true_num)<<std::endl;
+        if (true_num == inf_rum ) hit++;
         curr_index++;
-    }while(curr_index <= 20);
+    }while(curr_index <= n_images);
 
-
+    std::cout<<"Hit rate: "<< (float)hit/n_images;
 
 }
