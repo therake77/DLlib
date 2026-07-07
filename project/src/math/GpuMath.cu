@@ -1160,6 +1160,12 @@ void GpuMath::col2im2d(
     size_t block_size = 256;
     size_t grid_size  = (total + block_size - 1) / block_size;
 
+    //col2im2d_kernel accumulates into `out` via atomicAdd, so the output buffer must start
+    //at zero (the CPU path does std::fill(...,0) for the same reason). Without this, the
+    //conv dInput gradient is added onto stale/random buffer contents, which silently poisons
+    //upstream gradients whenever a Conv2D feeds another layer's backward pass.
+    cudaMemset(out, 0, out_shape.n_elements * sizeof(float));
+
     LLCN_MATH_KERNELS::col2im2d_kernel<<<grid_size, block_size>>>(
         in, out,
         N, C, H, W,

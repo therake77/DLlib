@@ -1,22 +1,23 @@
 #include <Llcnn.hpp>
 #include <filesystem>
 #include <cstddef>
+#include <limits>
 
 #define ADD_LAYER(v, LayerType, ...) v.push_back(std::make_unique<LayerType>(__VA_ARGS__))
 
 namespace fs = std::filesystem;
 
 /*
-    Isolation test: Conv2D -> ReLU -> BatchNorm -> MaxPooling -> Flatten -> FC -> ReLU ->
-    FC -> Output. Mirrors project/app.cpp's training loop. Conv2D (1 input channel,
-    8 features, 3x3 kernel, stride 1, no padding) gives (8,26,26); BatchNorm(8) normalizes
-    per-channel; MaxPooling (2x2 window, stride 2, no padding) gives (8,13,13); Flatten
-    gives 8*13*13=1352 features -> FC(1352,64) -> ReLU -> FC(64,10) -> Output. Conv2D+ReLU
-    and Conv2D+ReLU+MaxPooling (no BatchNorm) were already verified to converge cleanly.
-    With BatchNorm placed *before* ReLU (Conv2D -> BatchNorm -> ReLU), training collapsed
-    to predicting a constant class regardless of input. This variant moves BatchNorm to
-    *after* ReLU instead, to check whether the failure is positional (before vs. after the
-    activation) or whether BatchNorm is broken regardless of where it sits in the stack.
+    FC-only isolation test: Flatten -> FC -> ReLU -> FC -> OutputLayer.
+    No Conv2D, no Pooling, no BatchNorm — the simplest possible classifier, used to check
+    whether the GPU training path is numerically correct for the fully-connected + output
+    stack alone. Input is a MNIST batch (N,1,28,28); Flatten gives 1*28*28 = 784 features
+    -> FC(784,128) -> ReLU -> FC(128,10) -> OutputLayer(softmax + cross-entropy).
+
+    It trains a single fixed batch of 100 images for 500 epochs at lr -0.1 (the negative
+    sign flips each layer's ascent step into gradient descent). With so few samples and many
+    epochs this should overfit and drive the loss down close to zero, then predict the
+    training batch correctly at inference time.
 */
 int main(){
     auto dev = DeviceManager::get_gpu_device();
@@ -28,35 +29,12 @@ int main(){
 
     std::vector<std::unique_ptr<Layer>> layers;
     ADD_LAYER(
-        layers, Conv2D,
-        std::array<std::size_t,4>{8,1,3,3},
-        dev,
-        std::array<std::size_t,2>{0,0},
-        std::array<std::size_t,2>{1,1}
-    );
-    ADD_LAYER(
-        layers, ActivationLayer,
-        ActivationTypes::ReLU,
-        dev
-    );
-    ADD_LAYER(
-        layers, BatchNorm,
-        8, dev
-    );
-    ADD_LAYER(
-        layers, MaxPooling,
-        std::array<std::size_t, 2>{2,2},
-        std::array<std::size_t, 2>{2,2},
-        std::array<std::size_t, 2>{0,0},
-        dev
-    );
-    ADD_LAYER(
         layers, Flatten,
         dev
     );
     ADD_LAYER(
         layers, FullyConnected,
-        std::array<size_t, TENSOR_MAX_DIM>{1352,64},
+        std::array<size_t, TENSOR_MAX_DIM>{784,128},
         dev
     );
     ADD_LAYER(
@@ -66,7 +44,7 @@ int main(){
     );
     ADD_LAYER(
         layers, FullyConnected,
-        std::array<size_t, TENSOR_MAX_DIM>{64,10},
+        std::array<size_t, TENSOR_MAX_DIM>{128,10},
         dev
     );
     ADD_LAYER(
@@ -93,11 +71,17 @@ int main(){
     std::size_t epoch = 500;
     //Negative sign because every layer's update_weight() applies param += lr*grad (ascent),
     //so this flips it into a descent step. Same convention currently used in project/app.cpp.
-    float lr = -0.001f;
+    float lr = -0.1f;
     Tensor delta = Tensor({1},dev);
     std::size_t curr_index = 0;
     std::size_t batch_size = 100;
     std::size_t n_batchs_per_epoch = 1;
+
+    //Load the single fixed training batch once and keep reusing it every epoch.
+    Tensor input = dataset.load_batch_cpu(curr_index,batch_size);
+    Tensor labels = dataset.labels_one_hot_cpu(curr_index,batch_size);
+    input.to(dev);
+    labels.to(dev);
 
     do{
         std::cout << "Epoch: " << std::to_string(epoch) << std::endl;
@@ -105,12 +89,6 @@ int main(){
         std::size_t counter = 0;
         do{
             delta.to(dev);
-            std::cout << "Current index: " << std::to_string(curr_index) << std::endl;
-            Tensor input = dataset.load_batch_cpu(curr_index,batch_size);
-            Tensor labels = dataset.labels_one_hot_cpu(curr_index,batch_size);
-            input.to(dev);
-            labels.to(dev);
-
             /*Result contains a (N,) vector of errors*/
             auto errors = cnn.forward(input,labels);
             TensorMath::sum(
@@ -123,9 +101,8 @@ int main(){
                 1.0f/(float)batch_size,
                 delta
             );
-            std::cout << "Error" << std::endl;
             delta.to(cpu_dev);
-            fancy_print(delta);
+            std::cout << "Loss: " << delta.data()[0] << std::endl;
 
             cnn.backward(input,labels);
             cnn.update_weights(lr);
@@ -134,17 +111,18 @@ int main(){
         epoch--;
     }while (epoch > 0);
 
-    /*Now, perform inference*/
+    /*Now, perform inference over the trained batch and report accuracy.*/
     cnn.set_mode(LayerMode::Inference);
 
+    std::size_t correct = 0;
+    std::size_t total = 0;
     curr_index = 0;
     do{
-        std::cout << "Current index: " << std::to_string(curr_index) << std::endl;
-        Tensor input = dataset.load_cpu(curr_index);
+        Tensor sample = dataset.load_cpu(curr_index);
         Tensor label = dataset.labels_one_hot_cpu(curr_index,1);
-        input.to(dev);
+        sample.to(dev);
         label.to(cpu_dev);
-        auto _result = cnn.forward(input);
+        auto _result = cnn.forward(sample);
         Tensor result = Tensor(*_result,cpu_dev);
 
         std::size_t predicted = 0;
@@ -156,7 +134,6 @@ int main(){
                 predicted = i;
             }
         }
-        std::cout << "Result: " << std::to_string(predicted) << std::endl;
 
         std::size_t true_num = 0;
         max_value = std::numeric_limits<float>::lowest();
@@ -167,10 +144,16 @@ int main(){
                 true_num = i;
             }
         }
-        std::cout << "True value: " << std::to_string(true_num) << std::endl;
+
+        std::cout << "Result: " << std::to_string(predicted)
+                  << " | True value: " << std::to_string(true_num) << std::endl;
+        if(predicted == true_num) correct++;
+        total++;
 
         curr_index++;
-    }while(curr_index <= 20);
+    }while(curr_index < batch_size);
+
+    std::cout << "Train-batch accuracy: " << correct << "/" << total << std::endl;
 
     return 0;
 }
