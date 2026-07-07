@@ -17,6 +17,8 @@ int main(int argc, char** argv){
     std::size_t n_batchs_per_epoch = 937;
     float lr = -0.01f;
     bool same_batch = false;
+    bool use_batchnorm = true;
+    bool reset_each_epoch = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string mode = argv[i];
@@ -34,8 +36,12 @@ int main(int argc, char** argv){
             lr = std::stof(argv[++i]);
         } else if (mode == "--same-batch") {
             same_batch = true;
+        } else if (mode == "--no-batchnorm") {
+            use_batchnorm = false;
+        } else if (mode == "--reset-each-epoch") {
+            reset_each_epoch = true;
         } else {
-            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch]" << std::endl;
+            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch] [--no-batchnorm] [--reset-each-epoch]" << std::endl;
             return 1;
         }
     }
@@ -56,10 +62,12 @@ int main(int argc, char** argv){
         std::array<std::size_t,2>{0,0},
         std::array<std::size_t,2>{1,1}
     );
-    ADD_LAYER(
-        layers,BatchNorm,
-        32,dev
-    );
+    if (use_batchnorm) {
+        ADD_LAYER(
+            layers,BatchNorm,
+            32,dev
+        );
+    }
     ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::LeakyReLU,
@@ -79,10 +87,12 @@ int main(int argc, char** argv){
         std::array<std::size_t, 2>{0,0},
         std::array<std::size_t,2>{1,1}
     );
-    ADD_LAYER(
-        layers,BatchNorm,
-        64,dev
-    );
+    if (use_batchnorm) {
+        ADD_LAYER(
+            layers,BatchNorm,
+            64,dev
+        );
+    }
     ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::LeakyReLU,
@@ -149,6 +159,9 @@ int main(int argc, char** argv){
     std::size_t curr_index = 0;
     do{
         std::cout<<"Epoch: "<<std::to_string(epoch)<<std::endl;
+        if (reset_each_epoch) {
+            curr_index = 0;
+        }
         
         std::size_t counter = 0;
         do{
