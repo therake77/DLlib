@@ -44,14 +44,38 @@ const char* device_name(BenchDevice device) {
 Tensor make_one_hot_labels(
     std::size_t batch,
     std::size_t classes,
+    std::size_t batch_index,
     const std::shared_ptr<Device>& device
 ) {
     std::vector<float> labels(batch * classes, 0.0f);
     for(std::size_t n = 0; n < batch; ++n) {
-        labels[n * classes + (n % classes)] = 1.0f;
+        labels[n * classes + ((n + batch_index) % classes)] = 1.0f;
     }
 
     return Tensor({batch, classes, 0, 0}, labels.data(), device);
+}
+
+struct SyntheticBatch {
+    Tensor input;
+    Tensor labels;
+};
+
+std::vector<SyntheticBatch> make_synthetic_batches(
+    std::size_t batch,
+    std::size_t batch_count,
+    const std::shared_ptr<Device>& device
+) {
+    std::vector<SyntheticBatch> batches;
+    batches.reserve(batch_count);
+
+    for(std::size_t index = 0; index < batch_count; ++index) {
+        batches.push_back(SyntheticBatch{
+            Tensor({batch, 1, 28, 28}, device),
+            make_one_hot_labels(batch, 10, index, device)
+        });
+    }
+
+    return batches;
 }
 
 ConvolutionalNeuralNetwork make_mnist_cnn(const std::shared_ptr<Device>& device) {
@@ -288,36 +312,79 @@ void cnn_forward(benchmark::State& state, BenchDevice bench_device) {
     set_common_counters(state, bench_device, batch * 10);
 }
 
-void cnn_training_step_same_batch(benchmark::State& state, BenchDevice bench_device) {
+void cnn_training_step(benchmark::State& state, BenchDevice bench_device) {
     std::size_t batch = static_cast<std::size_t>(state.range(0));
     auto device = make_device(bench_device);
 
-    Tensor input({batch, 1, 28, 28}, device);
-    Tensor labels = make_one_hot_labels(batch, 10, device);
+    constexpr std::size_t synthetic_batch_count = 16;
+    auto batches = make_synthetic_batches(batch, synthetic_batch_count, device);
     auto cnn = make_mnist_cnn(device);
     cnn.set_mode(LayerMode::Training);
 
     constexpr float learning_rate = -0.01f;
 
-    auto warmup = cnn.forward(input, labels);
-    cnn.backward(input, labels);
+    auto warmup = cnn.forward(batches[0].input, batches[0].labels);
+    cnn.backward(batches[0].input, batches[0].labels);
     cnn.update_weights(learning_rate);
     benchmark::DoNotOptimize(warmup->data());
 
+    std::size_t batch_index = 0;
     for(auto _ : state) {
-        auto loss = cnn.forward(input, labels);
-        cnn.backward(input, labels);
+        const auto& current = batches[batch_index];
+        auto loss = cnn.forward(current.input, current.labels);
+        cnn.backward(current.input, current.labels);
         cnn.update_weights(learning_rate);
         benchmark::DoNotOptimize(loss->data());
+        batch_index = (batch_index + 1) % batches.size();
     }
 
     state.counters["batch"] = static_cast<double>(batch);
+    state.counters["synthetic_batches"] = static_cast<double>(synthetic_batch_count);
     state.counters["samples_per_second"] = benchmark::Counter(
         static_cast<double>(batch),
         benchmark::Counter::kIsIterationInvariantRate
     );
-    state.counters["same_batch"] = 1.0;
     set_common_counters(state, bench_device, batch);
+}
+
+void cnn_training_loop(benchmark::State& state, BenchDevice bench_device) {
+    std::size_t batch = static_cast<std::size_t>(state.range(0));
+    std::size_t training_steps = static_cast<std::size_t>(state.range(1));
+    auto device = make_device(bench_device);
+
+    constexpr std::size_t synthetic_batch_count = 16;
+    auto batches = make_synthetic_batches(batch, synthetic_batch_count, device);
+    auto cnn = make_mnist_cnn(device);
+    cnn.set_mode(LayerMode::Training);
+
+    constexpr float learning_rate = -0.01f;
+
+    auto warmup = cnn.forward(batches[0].input, batches[0].labels);
+    cnn.backward(batches[0].input, batches[0].labels);
+    cnn.update_weights(learning_rate);
+    benchmark::DoNotOptimize(warmup->data());
+
+    std::size_t batch_index = 0;
+    for(auto _ : state) {
+        std::shared_ptr<Tensor> loss;
+        for(std::size_t step = 0; step < training_steps; ++step) {
+            const auto& current = batches[batch_index];
+            loss = cnn.forward(current.input, current.labels);
+            cnn.backward(current.input, current.labels);
+            cnn.update_weights(learning_rate);
+            batch_index = (batch_index + 1) % batches.size();
+        }
+        benchmark::DoNotOptimize(loss->data());
+    }
+
+    state.counters["batch"] = static_cast<double>(batch);
+    state.counters["training_steps"] = static_cast<double>(training_steps);
+    state.counters["synthetic_batches"] = static_cast<double>(synthetic_batch_count);
+    state.counters["samples_per_second"] = benchmark::Counter(
+        static_cast<double>(batch * training_steps),
+        benchmark::Counter::kIsIterationInvariantRate
+    );
+    set_common_counters(state, bench_device, batch * training_steps);
 }
 
 void tensor_add_cpu(benchmark::State& state) {
@@ -340,8 +407,12 @@ void cnn_forward_cpu(benchmark::State& state) {
     cnn_forward(state, BenchDevice::CPU);
 }
 
-void cnn_training_step_same_batch_cpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::CPU);
+void cnn_training_step_cpu(benchmark::State& state) {
+    cnn_training_step(state, BenchDevice::CPU);
+}
+
+void cnn_training_loop_cpu(benchmark::State& state) {
+    cnn_training_loop(state, BenchDevice::CPU);
 }
 
 #ifdef __USE_CUDA__
@@ -365,8 +436,12 @@ void cnn_forward_gpu(benchmark::State& state) {
     cnn_forward(state, BenchDevice::GPU);
 }
 
-void cnn_training_step_same_batch_gpu(benchmark::State& state) {
-    cnn_training_step_same_batch(state, BenchDevice::GPU);
+void cnn_training_step_gpu(benchmark::State& state) {
+    cnn_training_step(state, BenchDevice::GPU);
+}
+
+void cnn_training_loop_gpu(benchmark::State& state) {
+    cnn_training_loop(state, BenchDevice::GPU);
 }
 
 void tensor_transfer_cpu_to_gpu(benchmark::State& state) {
@@ -409,14 +484,20 @@ BENCHMARK(cnn_forward_cpu)
     ->Arg(1)
     ->Arg(8)
     ->Arg(16)
-    ->Arg(32);
+    ->Arg(32)
+    ->Arg(64);
 
-BENCHMARK(cnn_training_step_same_batch_cpu)
-    ->Name("cnn_training_step_same_batch/CPU")
+BENCHMARK(cnn_training_step_cpu)
+    ->Name("cnn_training_step/CPU")
     ->Arg(1)
     ->Arg(8)
     ->Arg(16)
-    ->Arg(32);
+    ->Arg(32)
+    ->Arg(64);
+
+BENCHMARK(cnn_training_loop_cpu)
+    ->Name("cnn_training_loop/CPU")
+    ->Args({64, 10});
 
 #ifdef __USE_CUDA__
 BENCHMARK(tensor_add_gpu)
@@ -448,14 +529,20 @@ BENCHMARK(cnn_forward_gpu)
     ->Arg(1)
     ->Arg(8)
     ->Arg(16)
-    ->Arg(32);
+    ->Arg(32)
+    ->Arg(64);
 
-BENCHMARK(cnn_training_step_same_batch_gpu)
-    ->Name("cnn_training_step_same_batch/GPU")
+BENCHMARK(cnn_training_step_gpu)
+    ->Name("cnn_training_step/GPU")
     ->Arg(1)
     ->Arg(8)
     ->Arg(16)
-    ->Arg(32);
+    ->Arg(32)
+    ->Arg(64);
+
+BENCHMARK(cnn_training_loop_gpu)
+    ->Name("cnn_training_loop/GPU")
+    ->Args({64, 10});
 
 BENCHMARK(tensor_transfer_cpu_to_gpu)
     ->Name("tensor_transfer/CPU_to_GPU")

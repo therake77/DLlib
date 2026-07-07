@@ -57,7 +57,7 @@ Usar Nsight Systems primero para responder preguntas de alto nivel:
 - si las copias CPU/GPU dominan el tiempo;
 - si el benchmark realmente esta ejecutando trabajo en GPU.
 
-Ejemplo para el entrenamiento GPU con batch 32:
+Ejemplo para el entrenamiento GPU con batch 64:
 
 ```powershell
 & "C:\Program Files\NVIDIA Corporation\Nsight Systems 2026.1.3\target-windows-x64\nsys.exe" profile `
@@ -65,14 +65,14 @@ Ejemplo para el entrenamiento GPU con batch 32:
   --sample=none `
   --cpuctxsw=none `
   --force-overwrite=true `
-  -o benchmarks\results\nsys\cnn_training_step_same_batch_gpu_b32 `
+  -o benchmarks\results\nsys\cnn_training_step_gpu_b64 `
   .\build\benchmarks\Release\cnn_benchmark.exe `
-  --benchmark_filter="^cnn_training_step_same_batch/GPU/32$" `
+  --benchmark_filter="^cnn_training_step/GPU/64$" `
   --benchmark_repetitions=1 `
   --benchmark_min_time=0.1s
 ```
 
-Ejemplo para `cnn_forward` GPU con batch 32:
+Ejemplo para un loop de 10 pasos de entrenamiento:
 
 ```powershell
 & "C:\Program Files\NVIDIA Corporation\Nsight Systems 2026.1.3\target-windows-x64\nsys.exe" profile `
@@ -80,9 +80,24 @@ Ejemplo para `cnn_forward` GPU con batch 32:
   --sample=none `
   --cpuctxsw=none `
   --force-overwrite=true `
-  -o benchmarks\results\nsys\cnn_forward_gpu_b32 `
+  -o benchmarks\results\nsys\cnn_training_loop_gpu_b64_s10 `
   .\build\benchmarks\Release\cnn_benchmark.exe `
-  --benchmark_filter="^cnn_forward/GPU/32$" `
+  --benchmark_filter="^cnn_training_loop/GPU/64/10$" `
+  --benchmark_repetitions=1 `
+  --benchmark_min_time=0.1s
+```
+
+Ejemplo para `cnn_forward` GPU con batch 64:
+
+```powershell
+& "C:\Program Files\NVIDIA Corporation\Nsight Systems 2026.1.3\target-windows-x64\nsys.exe" profile `
+  --trace=cuda,nvtx `
+  --sample=none `
+  --cpuctxsw=none `
+  --force-overwrite=true `
+  -o benchmarks\results\nsys\cnn_forward_gpu_b64 `
+  .\build\benchmarks\Release\cnn_benchmark.exe `
+  --benchmark_filter="^cnn_forward/GPU/64$" `
   --benchmark_repetitions=1 `
   --benchmark_min_time=0.1s
 ```
@@ -90,7 +105,7 @@ Ejemplo para `cnn_forward` GPU con batch 32:
 Abrir el reporte generado con la interfaz grafica de Nsight Systems:
 
 ```powershell
-& "C:\Program Files\NVIDIA Corporation\Nsight Systems 2026.1.3\host-windows-x64\nsys-ui.exe" benchmarks\results\nsys\cnn_training_step_same_batch_gpu_b32.nsys-rep
+& "C:\Program Files\NVIDIA Corporation\Nsight Systems 2026.1.3\host-windows-x64\nsys-ui.exe" benchmarks\results\nsys\cnn_training_step_gpu_b64.nsys-rep
 ```
 
 ## Nsight Compute

@@ -37,7 +37,7 @@ El archivo `benchmarks/CMakeLists.txt` se encarga de:
 Conviene separar los benchmarks por nivel:
 
 - operaciones base: `add`, `multiply`, `divide`, `matmul`, `im2col`, pooling;
-- capas: `Conv2D::forward`, `FullyConnected::forward`, `BatchNorm::forward`;
+- capas: `Conv2D::forward`, `FullyConnected::forward`, activaciones y pooling;
 - pipeline parcial: `Conv2D -> ReLU -> Pooling -> Flatten -> FullyConnected`;
 - pipeline completo: CNN forward o entrenamiento, solo cuando todas las operaciones necesarias esten validadas en CPU y GPU;
 - dataset: carga de batches, separado del computo de la red.
@@ -314,7 +314,7 @@ Hasta entonces, es preferible medir operaciones y capas por separado.
 
 ## Benchmarks de red completa
 
-El ejecutable `cnn_benchmark` incluye benchmarks de una CNN tipo MNIST sin BatchNorm:
+El ejecutable `cnn_benchmark` incluye benchmarks de la CNN tipo MNIST usada por `project/app.cpp`:
 
 ```text
 Conv2D -> LeakyReLU -> MaxPooling
@@ -322,26 +322,41 @@ Conv2D -> LeakyReLU -> MaxPooling
 Flatten -> FullyConnected -> LeakyReLU -> FullyConnected -> OutputLayer
 ```
 
-BatchNorm se excluye de estos benchmarks porque la capa todavia esta bajo revision funcional en el entrenamiento. Hasta que esa ruta este estable, las graficas principales de red completa deben medir la arquitectura que se espera que aprenda correctamente.
-
 Los benchmarks disponibles son:
 
 ```text
 cnn_forward/CPU
 cnn_forward/GPU
-cnn_training_step_same_batch/CPU
-cnn_training_step_same_batch/GPU
+cnn_training_step/CPU
+cnn_training_step/GPU
+cnn_training_loop/CPU
+cnn_training_loop/GPU
 tensor_transfer/CPU_to_GPU
 tensor_transfer/GPU_to_CPU
 ```
 
-`cnn_training_step_same_batch` mide una iteracion completa:
+`cnn_training_step` mide una iteracion completa:
 
 ```text
 forward + backward + update_weights
 ```
 
-Este benchmark sigue la misma idea del flag `--same-batch` de `project/app.cpp`: el input y los labels se crean una sola vez fuera del bucle de medicion y luego se reutiliza exactamente el mismo batch en cada iteracion. Esto evita mezclar el costo del entrenamiento con variacion de dataset, carga de archivos o avance del indice del batch.
+El benchmark usa batches sinteticos precreados fuera del bucle medido y avanza entre ellos durante la medicion. Asi evita mezclar computo con lectura de archivos.
+
+`cnn_training_loop` mide varios pasos de entrenamiento consecutivos avanzando entre batches sinteticos:
+
+```text
+N * (forward + backward + update_weights)
+```
+
+El caso registrado por defecto usa:
+
+```text
+batch_size = 64
+training_steps = 10
+```
+
+Este benchmark es mas parecido al bucle interno de `project/app.cpp`, donde se ejecutan muchos batches por epoch. No se registra el caso completo de `937` batches por defecto porque haria que la suite completa tarde demasiado, especialmente en CPU.
 
 Ejecutar solo estos benchmarks:
 
@@ -349,8 +364,22 @@ Ejecutar solo estos benchmarks:
 .\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_
 ```
 
-Ejecutar solo entrenamiento con batch fijo:
+Ejecutar solo el benchmark de un paso de entrenamiento:
 
 ```powershell
-.\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_training_step_same_batch
+.\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_training_step
 ```
+
+Ejecutar el benchmark de varios pasos de entrenamiento:
+
+```powershell
+.\build\benchmarks\Release\cnn_benchmark.exe --benchmark_filter=cnn_training_loop
+```
+
+Los benchmarks de red completa usan batch sizes:
+
+```text
+1, 8, 16, 32, 64
+```
+
+El batch `64` coincide con el valor por defecto de `project/app.cpp`.
