@@ -17,7 +17,6 @@ int main(int argc, char** argv){
     std::size_t n_batchs_per_epoch = 937;
     float lr = -0.01f;
     bool same_batch = false;
-    bool use_batchnorm = true;
     bool reset_each_epoch = false;
 
     for (int i = 1; i < argc; ++i) {
@@ -36,12 +35,10 @@ int main(int argc, char** argv){
             lr = std::stof(argv[++i]);
         } else if (mode == "--same-batch") {
             same_batch = true;
-        } else if (mode == "--no-batchnorm") {
-            use_batchnorm = false;
         } else if (mode == "--reset-each-epoch") {
             reset_each_epoch = true;
         } else {
-            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch] [--no-batchnorm] [--reset-each-epoch]" << std::endl;
+            std::cerr << "Uso: " << argv[0] << " [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch] [--reset-each-epoch]" << std::endl;
             return 1;
         }
     }
@@ -62,12 +59,6 @@ int main(int argc, char** argv){
         std::array<std::size_t,2>{0,0},
         std::array<std::size_t,2>{1,1}
     );
-    if (use_batchnorm) {
-        ADD_LAYER(
-            layers,BatchNorm,
-            32,dev
-        );
-    }
     ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::LeakyReLU,
@@ -87,12 +78,6 @@ int main(int argc, char** argv){
         std::array<std::size_t, 2>{0,0},
         std::array<std::size_t,2>{1,1}
     );
-    if (use_batchnorm) {
-        ADD_LAYER(
-            layers,BatchNorm,
-            64,dev
-        );
-    }
     ADD_LAYER(
         layers,ActivationLayer,
         ActivationTypes::LeakyReLU,

@@ -24,6 +24,11 @@
         Tensor(std::array<size_t,TENSOR_MAX_DIM>, std::shared_ptr<Device> = DeviceManager::get_cpu_device(), float = 0.0f, bool = false);    
         Tensor(std::array<size_t,TENSOR_MAX_DIM>, const float*, std::shared_ptr<Device> = DeviceManager::get_cpu_device());
         Tensor(const Tensor&, const std::shared_ptr<Device> = DeviceManager::get_cpu_device());
+        //Move operations: transfer device + buffers so returning a Tensor by value
+        //(e.g. from FlatDataset::load_batch) preserves its device instead of falling back
+        //to the CPU-defaulting copy constructor above.
+        Tensor(Tensor&&) noexcept;
+        Tensor& operator=(Tensor&&) noexcept;
         float* data();
         const float* data() const;
         void to(std::shared_ptr<Device>);

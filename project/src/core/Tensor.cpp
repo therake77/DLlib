@@ -105,6 +105,22 @@ Tensor::Tensor(const Tensor& t, const std::shared_ptr<Device> device) : device(d
     }
 }
 
+Tensor::Tensor(Tensor&& other) noexcept
+    : device(std::move(other.device)),
+      cpu_data(std::move(other.cpu_data)),
+      gpu_data(std::move(other.gpu_data)),
+      shape(other.shape) {}
+
+Tensor& Tensor::operator=(Tensor&& other) noexcept {
+    if(this != &other){
+        device   = std::move(other.device);
+        cpu_data = std::move(other.cpu_data);
+        gpu_data = std::move(other.gpu_data);
+        shape    = other.shape;
+    }
+    return *this;
+}
+
 float* Tensor::data(){
     if( this->device.get()->get_type() == DeviceType::CPU){
         return static_cast<float*>(this->cpu_data.get());
