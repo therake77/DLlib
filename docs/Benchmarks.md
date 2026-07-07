@@ -287,6 +287,19 @@ Si se quiere usar la mediana en vez de la media:
 scripts\.venv\Scripts\python.exe scripts\analyze_benchmarks.py benchmarks\results.json --aggregate median
 ```
 
+## Profiling con Nsight
+
+Despues de generar los tiempos base con Google Benchmark, usar Nsight Systems y Nsight Compute para explicar el comportamiento observado:
+
+- Nsight Systems: linea de tiempo CPU/GPU, kernels, transferencias y sincronizaciones.
+- Nsight Compute: metricas internas de kernels CUDA concretos.
+
+Los comandos recomendados estan documentados en:
+
+```text
+docs/Nsight profiling.md
+```
+
 ## Criterio para benchmarks end-to-end
 
 Un benchmark end-to-end de CNN CPU vs GPU debe agregarse solo cuando:
