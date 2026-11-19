@@ -1,83 +1,74 @@
-# llcnn
+# DLlib
 
-`llcnn` es una biblioteca de redes neuronales convolucionales escrita desde cero en C++17 (CPU y CUDA opcional). No depende de ningún framework de machine learning: los tensores, las capas, los kernels matemáticos y el pipeline de datos estilo MNIST están implementados a mano.
+`DLLib` es una biblioteca de redes neuronales convolucionales escrita desde cero en C++17 (CPU y CUDA opcional). No depende de ningún framework de machine learning: los tensores, las capas, los kernels matemáticos y el pipeline de datos estilo MNIST están implementados a mano.
 
-Incluye:
+`DLLib` is a library written from scratch in C++17 focused on implementing basic deep learning primitives, such as Dense Layers and Convolution Layers, etc. It also provide ways to work with multidimensional arrays (tensors), including broadcasting, and support routines written in CPU and GPU, using a device abstraction layer.
 
-- **Tensores** de rango fijo (hasta 4 dimensiones) con soporte de vistas no contiguas, broadcasting y strides.
-- **Abstracción de dispositivo** (`CpuDevice` / `GpuDevice`), cada uno con su implementación de `Math` (`CpuMath` / `GpuMath`), de modo que las capas se escriben contra la interfaz y no contra CPU o CUDA directamente.
-- **Capas**: `Conv2D`, `FullyConnected`, `BatchNorm`, `ActivationLayer`, `MaxPooling` / `AvgPooling`, `Flatten` y `OutputLayer` (softmax + entropía cruzada).
-- Convolución vía im2col, pooling, batchnorm y backprop implementados manualmente.
-- Un **pipeline de datos** simple (`Dataset` / `DataLoader` / `FlatDataset`) para cargar imágenes y generar batches.
 
-El soporte CUDA se detecta automáticamente en CMake: si hay un compilador CUDA disponible se compilan las rutas de GPU; si no, simplemente se excluyen del build.
+## Compilation
 
-## Compilación
-
-Configurado con CMake (generador MSVC / Visual Studio 17 2022; build en modo Debug por defecto).
-
+You need to use `cmake`
 ```
 cmake -S . -B build
 cmake --build build --config Debug
 ```
 
-## Ejecutar `project/app.cpp`
+## App example
 
-`app.cpp` es el ejemplo de referencia: arma una CNN, carga MNIST, entrena y luego hace inferencia sobre algunas imágenes. Se compila en el ejecutable `main`.
+There is an example of a CNN trained over MNIST on `project/app.cpp`. You can execute it following the next steps
 
-1. Prepara los datos de MNIST en formato binario plano. `app.cpp` espera encontrarlos en `datasets/mnist/flat/`:
+1. You need the mnist files preprocessed as `.bin` files.
 
    ```
    datasets/mnist/flat/train_images_float32.bin
    datasets/mnist/flat/train_labels_uint8.bin
    ```
 
-   Puedes generarlos a partir de los archivos IDX de MNIST con el script incluido:
+   Files can be generated using the next python script:
 
    ```
    python scripts/export_mnist_flat.py
    ```
 
-2. Compila el ejecutable:
+2. Compile the executable:
 
    ```
    cmake --build build --config Debug --target main
    ```
 
-3. Ejecútalo desde la raíz del proyecto (las rutas del dataset son relativas a este directorio):
+3. Execute it from the root directory:
 
    ```
    ./build/Debug/main.exe
    ```
 
-### Opciones de línea de comandos
+### Command line arguments
 
 ```
 main [--cpu|--gpu] [--epochs N] [--batches N] [--batch-size N] [--lr LR] [--same-batch] [--reset-each-epoch]
 ```
 
-| Opción               | Descripción                                             | Por defecto |
+| Option               | Description                                             | Default     |
 | -------------------- | ------------------------------------------------------- | ----------- |
-| `--cpu` / `--gpu`    | Elige el dispositivo de ejecución.                      | `--cpu`     |
-| `--epochs N`         | Número de épocas de entrenamiento.                      | `10`        |
-| `--batches N`        | Batches por época.                                      | `937`       |
-| `--batch-size N`     | Tamaño de cada batch.                                   | `64`        |
-| `--lr LR`            | Tasa de aprendizaje.                                    | `-0.01`     |
-| `--same-batch`       | Reutiliza siempre el primer batch (útil para depurar).  | off         |
-| `--reset-each-epoch` | Reinicia el índice del dataset al inicio de cada época. | off         |
+| `--cpu` / `--gpu`    | Switch between CPU and GPU                              | `--cpu`     |
+| `--epochs N`         | Number of epochs                                        | `10`        |
+| `--batches N`        | Batches per epoch                                       | `937`       |
+| `--batch-size N`     | Batch size                                              | `64`        |
+| `--lr LR`            | Learning rate.                                          | `-0.01`     |
 
-### Parámetros recomendados
 
-La configuración probada que da buenos resultados es:
+### Recommended hyperparameters
+
+I tested this hyperparameter configuration:
 
 ```
 ./build/Debug/main.exe --batches 100 --batch-size 64 --lr -0.02
 ```
 
-Ejemplo (entrenar en GPU durante 5 épocas):
+And this execution
 
 ```
 ./build/Debug/main.exe --gpu --epochs 5
 ```
 
-Al terminar el entrenamiento, el programa realiza inferencia sobre unas imágenes y muestra la tasa de aciertos (*hit rate*).
+Resulting in a hit rate of 99%.
