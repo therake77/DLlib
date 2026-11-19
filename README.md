@@ -1,7 +1,5 @@
 # DLlib
 
-`DLLib` es una biblioteca de redes neuronales convolucionales escrita desde cero en C++17 (CPU y CUDA opcional). No depende de ningún framework de machine learning: los tensores, las capas, los kernels matemáticos y el pipeline de datos estilo MNIST están implementados a mano.
-
 `DLLib` is a library written from scratch in C++17 focused on implementing basic deep learning primitives, such as Dense Layers and Convolution Layers, etc. It also provide ways to work with multidimensional arrays (tensors), including broadcasting, and support routines written in CPU and GPU, using a device abstraction layer.
 
 
