@@ -13,7 +13,7 @@ cmake --build build --config Debug
 
 ## App example
 
-There is an example of a CNN trained over MNIST on `project/app.cpp`. You can execute it following the next steps
+There is an example of a CNN trained on MNIST  [`project/app.cpp`]. You can execute it following the next steps
 
 1. You need the mnist files preprocessed as `.bin` files.
 
